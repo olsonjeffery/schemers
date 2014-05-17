@@ -33,10 +33,32 @@ fn tokenize(input: ~str) -> Vec<~str> {
         .filter(|i| *i != "").map(|i| i.to_owned()).collect()
 }
 
+pub enum ParseItem {
+    Atom(~str),
+    List(Vec<~ParseItem>)
+}
+
+fn read(tokens: &mut Vec<~str>) -> ParseItem {
+    if tokens.len() == 0 {
+        fail!("calling read() with an empty tokens vector");
+    }
+    match tokens.pop().expect("calling read() w/ empty token list; shouldn't happen") {
+        ref x if *x == ~"(" => {
+            let mut list = Vec::new();
+            while *tokens.get(0) != ~")" {
+                list.push(box read(tokens));
+            }
+            tokens.pop();
+            List(list)
+        },
+        ref x if *x == ~")" => fail!("hit ) token; shouldn't happen"),
+        x => Atom(x)
+    }
+}
+
 #[cfg(test)]
 mod parser_test {
-    use super::pad_input;
-    use super::tokenize;
+    use super::{pad_input, tokenize, read, Atom};
 
     #[test]
     fn pad_input_should_insert_spaces_before_and_after_parens() {
@@ -47,5 +69,14 @@ mod parser_test {
     fn tokenize_should_split_string_into_tokens() {
         let tokens = tokenize(~"(foo 12 3)");
         assert_eq!(tokens.len(), 5);
+    }
+
+    #[test]
+    fn parse_should_take_a_vector_consisting_an_atom_and_convert_it_to_a_parse_item() {
+        let tokens = &mut tokenize(~"bar");
+        match read(tokens) {
+            Atom(val) => { assert_eq!(val, ~"bar")},
+            _ => assert!(false)
+        }
     }
 }
