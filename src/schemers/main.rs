@@ -38,8 +38,8 @@ fn tokenize(input: ~str) -> Vec<~str> {
 
 #[deriving(Eq, Show)]
 pub enum ParseItem {
-    AtomItem(Atom),
-    ListItem(Vec<~ParseItem>)
+    Atom(AtomType),
+    List(Vec<~ParseItem>)
 }
 impl ParseItem {
     pub fn new_atom(input: ~str) -> ParseItem {
@@ -49,25 +49,25 @@ impl ParseItem {
             '6' | '7' | '8' | '9' => {
                 let val = FromStr::from_str(input);
                 match val {
-                    Some(val) => AtomItem(IntAtom(val)),
+                    Some(val) => Atom(Integer(val)),
                     None => fail!("Cannot parse number-like input of: {}", input)
                 }
             },
-            _ => AtomItem(StrAtom(input))
+            _ => Atom(Symbol(input))
         }
     }
 }
 
 #[deriving(Eq, Show)]
-pub enum Atom {
-    StrAtom(~str),
-    IntAtom(int)
+pub enum AtomType {
+    Symbol(~str),
+    Integer(int)
 }
 
 impl ParseItem {
     pub fn is_atom(&self) -> bool {
         match *self {
-            AtomItem(_) => true,
+            Atom(_) => true,
             _ => false
         }
     }
@@ -83,7 +83,7 @@ fn read(tokens: &mut Vec<~str>) -> ParseItem {
                 list.push(box read(tokens));
             }
             tokens.shift();
-            ListItem(list)
+            List(list)
         },
         ref x if *x == ~")" => fail!("hit ) token; shouldn't happen"),
         x => ParseItem::new_atom(x)
@@ -92,7 +92,7 @@ fn read(tokens: &mut Vec<~str>) -> ParseItem {
 
 #[cfg(test)]
 mod parser_test {
-    use super::{pad_input, tokenize, read, AtomItem, ListItem, StrAtom, IntAtom};
+    use super::{pad_input, tokenize, read, Atom, List, Symbol, Integer};
 
     #[test]
     fn pad_input_should_insert_spaces_before_and_after_parens() {
@@ -116,7 +116,7 @@ mod parser_test {
         let parsed_item = read(tokens);
         println!("{:?}", parsed_item);
         match parsed_item {
-            AtomItem(StrAtom(val)) => {
+            Atom(Symbol(val)) => {
                 assert_eq!(val, ~"bar")
             },
             _ => assert!(false)
@@ -128,7 +128,7 @@ mod parser_test {
         let parsed_item = read(tokens);
         println!("{:?}", parsed_item);
         match parsed_item {
-            AtomItem(IntAtom(val)) => {
+            Atom(Integer(val)) => {
                 assert_eq!(val, 42)
             },
             _ => assert!(false)
@@ -141,15 +141,15 @@ mod parser_test {
         let parsed_item = read(tokens);
         assert_eq!(parsed_item.is_atom(), false);
         match parsed_item {
-            ListItem(items) => {
+            List(items) => {
                 let items_len = items.len();
                 assert!(3 == items_len);
                 assert_eq!(items.get(0).is_atom(), true);
-                assert_eq!(*items.get(0), ~AtomItem(StrAtom(~"bar")));
+                assert_eq!(*items.get(0), ~Atom(Symbol(~"bar")));
                 assert_eq!(items.get(1).is_atom(), true);
-                assert_eq!(*items.get(1), ~AtomItem(IntAtom(12)));
+                assert_eq!(*items.get(1), ~Atom(Integer(12)));
                 assert_eq!(items.get(2).is_atom(), true);
-                assert_eq!(*items.get(2), ~AtomItem(IntAtom(45)));
+                assert_eq!(*items.get(2), ~Atom(Integer(45)));
             },
             _ => fail!("got back an atom, it seems")
         }
@@ -160,27 +160,27 @@ mod parser_test {
         let parsed_item = read(tokens);
         assert_eq!(parsed_item.is_atom(), false);
         match parsed_item {
-            ListItem(items) => {
+            List(items) => {
                 let items_len = items.len();
                 assert!(4 == items_len);
                 match *items.get(0) {
-                    ~ListItem(ref items) => {
+                    ~List(ref items) => {
                         assert_eq!(items.len(), 2);
-                        assert_eq!(*items.get(0), ~AtomItem(IntAtom(2)));
-                        assert_eq!(*items.get(1), ~AtomItem(IntAtom(3)));
+                        assert_eq!(*items.get(0), ~Atom(Integer(2)));
+                        assert_eq!(*items.get(1), ~Atom(Integer(3)));
                     },
                     _ => fail!("shoulda got a list")
                 }
-                assert_eq!(*items.get(1), ~AtomItem(StrAtom(~"bar")));
-                assert_eq!(*items.get(2), ~AtomItem(IntAtom(12)));
+                assert_eq!(*items.get(1), ~Atom(Symbol(~"bar")));
+                assert_eq!(*items.get(2), ~Atom(Integer(12)));
                 match *items.get(3) {
-                    ~ListItem(ref items) => {
+                    ~List(ref items) => {
                         assert_eq!(items.len(), 2);
-                        assert_eq!(*items.get(0), ~AtomItem(StrAtom(~"hee")));
+                        assert_eq!(*items.get(0), ~Atom(Symbol(~"hee")));
                         match *items.get(1) {
-                            ~ListItem(ref items) => {
+                            ~List(ref items) => {
                                 assert_eq!(items.len(), 1);
-                                assert_eq!(*items.get(0), ~AtomItem(StrAtom(~"hah")));
+                                assert_eq!(*items.get(0), ~Atom(Symbol(~"hah")));
                             },
                             _ => fail!("shoulda got a list")
                         }
