@@ -34,20 +34,31 @@ fn tokenize(input: ~str) -> Vec<~str> {
         .filter(|i| *i != "").map(|i| i.to_owned()).collect()
 }
 
+#[deriving(Eq, Show)]
 pub enum ParseItem {
     Atom(~str),
     List(Vec<~ParseItem>)
 }
 
+impl ParseItem {
+    pub fn is_atom(&self) -> bool {
+        match *self {
+            Atom(_) => true,
+            _ => false
+        }
+    }
+}
+
 fn read(tokens: &mut Vec<~str>) -> ParseItem {
-    println!("current state of tokens: '{:?}'", tokens);
-    match tokens.pop().expect("calling read() w/ empty token list; shouldn't happen") {
+    let current_token =
+        tokens.shift().expect("calling read() w/ empty token list; shouldn't happen");
+    match current_token {
         ref x if *x == ~"(" => {
             let mut list = Vec::new();
             while *tokens.get(0) != ~")" {
                 list.push(box read(tokens));
             }
-            tokens.pop();
+            tokens.shift();
             List(list)
         },
         ref x if *x == ~")" => fail!("hit ) token; shouldn't happen"),
@@ -57,7 +68,7 @@ fn read(tokens: &mut Vec<~str>) -> ParseItem {
 
 #[cfg(test)]
 mod parser_test {
-    use super::{pad_input, tokenize, read, Atom};
+    use super::{pad_input, tokenize, read, Atom, List};
 
     #[test]
     fn pad_input_should_insert_spaces_before_and_after_parens() {
@@ -76,7 +87,7 @@ mod parser_test {
     }
 
     #[test]
-    fn parse_should_take_a_vector_consisting_an_atom_and_convert_it_to_a_parse_item() {
+    fn should_parse_tokens_consisting_an_atom_and_convert_it_to_a_parse_item() {
         let tokens = &mut tokenize(~"bar");
         let parsed_item = read(tokens);
         println!("{:?}", parsed_item);
@@ -85,6 +96,63 @@ mod parser_test {
                 assert_eq!(val, ~"bar")
             },
             _ => assert!(false)
+        }
+    }
+
+    #[test]
+    fn should_parse_tokens_consisting_of_a_list_of_atoms_and_parse_it() {
+        let tokens = &mut tokenize(~"(bar 12 45)");
+        let parsed_item = read(tokens);
+        assert_eq!(parsed_item.is_atom(), false);
+        match parsed_item {
+            List(items) => {
+                let items_len = items.len();
+                assert!(3 == items_len);
+                assert_eq!(items.get(0).is_atom(), true);
+                assert_eq!(*items.get(0), ~Atom(~"bar"));
+                assert_eq!(items.get(1).is_atom(), true);
+                assert_eq!(*items.get(1), ~Atom(~"12"));
+                assert_eq!(items.get(2).is_atom(), true);
+                assert_eq!(*items.get(2), ~Atom(~"45"));
+            },
+            _ => fail!("got back an atom, it seems")
+        }
+    }
+    #[test]
+    fn should_parse_tokens_consisting_of_a_list_of_atoms_and_a_nested_list() {
+        let tokens = &mut tokenize(~"((2 3) bar 12 (hee (hah)))");
+        let parsed_item = read(tokens);
+        assert_eq!(parsed_item.is_atom(), false);
+        match parsed_item {
+            List(items) => {
+                let items_len = items.len();
+                assert!(4 == items_len);
+                match *items.get(0) {
+                    ~List(ref items) => {
+                        assert_eq!(items.len(), 2);
+                        assert_eq!(*items.get(0), ~Atom(~"2"));
+                        assert_eq!(*items.get(1), ~Atom(~"3"));
+                    },
+                    _ => fail!("shoulda got a list")
+                }
+                assert_eq!(*items.get(1), ~Atom(~"bar"));
+                assert_eq!(*items.get(2), ~Atom(~"12"));
+                match *items.get(3) {
+                    ~List(ref items) => {
+                        assert_eq!(items.len(), 2);
+                        assert_eq!(*items.get(0), ~Atom(~"hee"));
+                        match *items.get(1) {
+                            ~List(ref items) => {
+                                assert_eq!(items.len(), 1);
+                                assert_eq!(*items.get(0), ~Atom(~"hah"));
+                            },
+                            _ => fail!("shoulda got a list")
+                        }
+                    },
+                    _ => fail!("shoulda got a list")
+                }
+            },
+            _ => fail!("got back an atom, it seems")
         }
     }
 }
