@@ -28,6 +28,10 @@ fn main() {
 }
 
 // parser impl
+fn parse_str(input: ~str) -> Expr {
+    parse(&mut tokenize(input))
+}
+
 fn pad_input(input: ~str) -> ~str {
     input.replace("(", " ( ").replace(")", " ) ")
 }
@@ -82,6 +86,19 @@ impl Expr {
                 out.trim() + ")"
             },
             &Atom(ref v) => v.print()
+        }
+    }
+    pub fn un_cons(self) -> (Expr, Option<Expr>) {
+        match self {
+            Atom(v) => (Atom(v), None),
+            List(mut items) => {
+                if items.len() == 0 {
+                    fail!("cannot build car/cdr of empty list");
+                }
+                let car = items.shift()
+                    .expect("at least one item in the least; shouldn't happen");
+                (*car, Some(List(items)))
+            }
         }
     }
 }
@@ -240,5 +257,50 @@ mod parser_test {
         let parsed_item = parse(tokens);
         let output = parsed_item.print();
         assert_eq!(input, output);
+    }
+}
+
+#[cfg(test)]
+mod eval_test {
+    mod un_cons {
+        use super::super::{parse_str, Atom, List, Symbol};
+        #[test]
+        fn an_atom_expr_returns_the_atom_in_the_car_with_none_in_the_cdr() {
+            let expr = parse_str(~"x");
+            let (car, cdr) = expr.un_cons();
+            assert_eq!(car, Atom(Symbol(~"x")));
+            assert_eq!(cdr, None);
+        }
+
+        #[test]
+        fn a_list_with_one_atom_element_returns_an_atom_car_and_an_empty_list_in_the_cdr() {
+            let expr = parse_str(~"(x)");
+            let (car, cdr) = expr.un_cons();
+            assert_eq!(car, Atom(Symbol(~"x")));
+            match cdr.expect("should be a value here") {
+                List(items) => assert_eq!(items.len(), 0),
+                _ => fail!("expected a list")
+            }
+        }
+
+        #[test]
+        fn a_list_with_multiple_elements_returns_the_first_car_and_the_rust_in_the_cdr() {
+            let expr = parse_str(~"(y 2 3)");
+            let (car, cdr) = expr.un_cons();
+            assert_eq!(car, Atom(Symbol(~"y")));
+            match cdr.expect("should be a value here") {
+                List(items) => {
+                    assert_eq!(items.len(), 2)
+                },
+                _ => fail!("expected a list")
+            }
+        }
+
+        #[test]
+        #[should_fail]
+        fn calling_extract_on_an_empty_list_should_fail() {
+            let expr = parse_str(~"()");
+            expr.un_cons();
+        }
     }
 }
