@@ -23,7 +23,8 @@ fn main() {
     let program: ~str = args.move_iter()
         .fold(~"", |memo, arg| memo + arg + " ").trim().to_owned();
     let tokens = &mut tokenize(program);
-    println!("{:?}", parse(tokens));
+    let parsed_items = parse(tokens);
+    println!("{}", parsed_items.print());
 }
 
 // parser impl
@@ -65,6 +66,24 @@ impl ParseItem {
             _ => Atom(Symbol(input))
         }
     }
+
+    pub fn is_atom(&self) -> bool {
+        match *self {
+            Atom(_) => true,
+            _ => false
+        }
+    }
+
+    pub fn print(&self) -> ~str {
+        match self {
+            &List(ref items) => {
+                let out = items.iter().map(|i| i.print())
+                    .fold(~"(", |m, v| m + v + " ");
+                out.trim() + ")"
+            },
+            &Atom(ref v) => v.print()
+        }
+    }
 }
 
 #[deriving(Eq, Show)]
@@ -74,11 +93,12 @@ pub enum AtomType {
     Float(f64)
 }
 
-impl ParseItem {
-    pub fn is_atom(&self) -> bool {
-        match *self {
-            Atom(_) => true,
-            _ => false
+impl AtomType {
+    pub fn print(&self) -> ~str {
+        match self {
+            &Symbol(ref v) => v.to_owned(),
+            &Integer(ref v) => v.to_str(),
+            &Float(ref v) => v.to_str()
         }
     }
 }
@@ -212,5 +232,13 @@ mod parser_test {
             },
             _ => fail!("got back an atom, it seems")
         }
+    }
+    #[test]
+    fn parsed_tokens_of_a_list_of_atoms_and_a_nested_list_should_to_str_correctly() {
+        let input = ~"((2 3) bar 12 (hee (hah)))";
+        let tokens = &mut tokenize(input.to_owned());
+        let parsed_item = parse(tokens);
+        let output = parsed_item.print();
+        assert_eq!(input, output);
     }
 }
