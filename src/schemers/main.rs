@@ -23,7 +23,7 @@ fn main() {
     let program: ~str = args.move_iter()
         .fold(~"", |memo, arg| memo + arg + " ").trim().to_owned();
     let tokens = &mut tokenize(program);
-    println!("{:?}", read(tokens));
+    println!("{:?}", parse(tokens));
 }
 
 // parser impl
@@ -73,14 +73,14 @@ impl ParseItem {
     }
 }
 
-fn read(tokens: &mut Vec<~str>) -> ParseItem {
+fn parse(tokens: &mut Vec<~str>) -> ParseItem {
     let current_token =
-        tokens.shift().expect("calling read() w/ empty token list; shouldn't happen");
+        tokens.shift().expect("calling parse() w/ empty token list; shouldn't happen");
     match current_token {
         ref x if *x == ~"(" => {
             let mut list = Vec::new();
             while *tokens.get(0) != ~")" {
-                list.push(box read(tokens));
+                list.push(box parse(tokens));
             }
             tokens.shift();
             List(list)
@@ -92,7 +92,7 @@ fn read(tokens: &mut Vec<~str>) -> ParseItem {
 
 #[cfg(test)]
 mod parser_test {
-    use super::{pad_input, tokenize, read, Atom, List, Symbol, Integer};
+    use super::{pad_input, tokenize, parse, Atom, List, Symbol, Integer};
 
     #[test]
     fn pad_input_should_insert_spaces_before_and_after_parens() {
@@ -113,7 +113,7 @@ mod parser_test {
     #[test]
     fn should_parse_tokens_consisting_of_a_str_atom_and_convert_it_to_a_parse_item() {
         let tokens = &mut tokenize(~"bar");
-        let parsed_item = read(tokens);
+        let parsed_item = parse(tokens);
         println!("{:?}", parsed_item);
         match parsed_item {
             Atom(Symbol(val)) => {
@@ -125,7 +125,7 @@ mod parser_test {
     #[test]
     fn should_parse_tokens_consisting_of_an_int_atom_and_convert_it_to_a_parse_item() {
         let tokens = &mut tokenize(~"42");
-        let parsed_item = read(tokens);
+        let parsed_item = parse(tokens);
         println!("{:?}", parsed_item);
         match parsed_item {
             Atom(Integer(val)) => {
@@ -138,7 +138,7 @@ mod parser_test {
     #[test]
     fn should_parse_tokens_consisting_of_a_list_of_atoms_and_parse_it() {
         let tokens = &mut tokenize(~"(bar 12 45)");
-        let parsed_item = read(tokens);
+        let parsed_item = parse(tokens);
         assert_eq!(parsed_item.is_atom(), false);
         match parsed_item {
             List(items) => {
@@ -157,7 +157,7 @@ mod parser_test {
     #[test]
     fn should_parse_tokens_consisting_of_a_list_of_atoms_and_a_nested_list() {
         let tokens = &mut tokenize(~"((2 3) bar 12 (hee (hah)))");
-        let parsed_item = read(tokens);
+        let parsed_item = parse(tokens);
         assert_eq!(parsed_item.is_atom(), false);
         match parsed_item {
             List(items) => {
