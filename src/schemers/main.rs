@@ -38,12 +38,12 @@ fn tokenize(input: ~str) -> Vec<~str> {
 }
 
 #[deriving(Eq, Show)]
-pub enum Expression {
+pub enum Expr {
     Atom(AtomType),
-    List(Vec<~Expression>)
+    List(Vec<~Expr>)
 }
-impl Expression {
-    pub fn new_atom(input: ~str) -> Expression {
+impl Expr {
+    pub fn new_atom(input: ~str) -> Expr {
         let first_char = input.char_at(0);
         match first_char {
             '0' | '1' | '2' | '3' | '4' | '5' |
@@ -103,7 +103,7 @@ impl AtomType {
     }
 }
 
-fn parse(tokens: &mut Vec<~str>) -> Expression {
+fn parse(tokens: &mut Vec<~str>) -> Expr {
     let current_token =
         tokens.shift().expect("calling parse() w/ empty token list; shouldn't happen");
     match current_token {
@@ -116,7 +116,7 @@ fn parse(tokens: &mut Vec<~str>) -> Expression {
             List(list)
         },
         ref x if *x == ~")" => fail!("hit ) token; shouldn't happen"),
-        x => Expression::new_atom(x)
+        x => Expr::new_atom(x)
     }
 }
 
