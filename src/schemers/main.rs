@@ -6,21 +6,24 @@
 // except according to those terms.
 use std::os::args;
 
-fn run(_input: ~str) -> ~str {
-    ~""
-}
+// this is starting out as a straight port of Peter Norvig's
+// lis.py (the first iteration) to Rust
 
 fn main() {
     let _args = args();
-    println!("{}", run(~""));
+    println!("{}", ~"");
+}
+
+fn pad_input(input: ~str) -> ~str {
+    input.replace("(", " ( ").replace(")", " ) ")
 }
 
 #[cfg(test)]
 mod test {
-    use super::run;
+    use super::pad_input;
     
     #[test]
-    fn number_literal_evals_to_itself() {
-        assert!(run(~"12") == ~"12");
+    fn pad_input_should_insert_spaces_before_and_after_parens() {
+        assert!(pad_input(~"(x 1 2 3)") == ~" ( x 1 2 3 ) ");
     }
 }
