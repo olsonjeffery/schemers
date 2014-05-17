@@ -47,10 +47,19 @@ impl ParseItem {
         match first_char {
             '0' | '1' | '2' | '3' | '4' | '5' |
             '6' | '7' | '8' | '9' => {
-                let val = FromStr::from_str(input);
-                match val {
-                    Some(val) => Atom(Integer(val)),
-                    None => fail!("Cannot parse number-like input of: {}", input)
+                match input.contains(".") {
+                    true => {
+                        match FromStr::from_str(input) {
+                            Some(val) => Atom(Float(val)),
+                            None => fail!("Cannot parse number-like input of: {}", input)
+                        }
+                    },
+                    false => {
+                        match FromStr::from_str(input) {
+                            Some(val) => Atom(Integer(val)),
+                            None => fail!("Cannot parse number-like input of: {}", input)
+                        }
+                    }
                 }
             },
             _ => Atom(Symbol(input))
@@ -61,7 +70,8 @@ impl ParseItem {
 #[deriving(Eq, Show)]
 pub enum AtomType {
     Symbol(~str),
-    Integer(int)
+    Integer(i64),
+    Float(f64)
 }
 
 impl ParseItem {
@@ -92,7 +102,7 @@ fn parse(tokens: &mut Vec<~str>) -> ParseItem {
 
 #[cfg(test)]
 mod parser_test {
-    use super::{pad_input, tokenize, parse, Atom, List, Symbol, Integer};
+    use super::{pad_input, tokenize, parse, Atom, List, Symbol, Integer, Float};
 
     #[test]
     fn pad_input_should_insert_spaces_before_and_after_parens() {
@@ -130,6 +140,18 @@ mod parser_test {
         match parsed_item {
             Atom(Integer(val)) => {
                 assert_eq!(val, 42)
+            },
+            _ => assert!(false)
+        }
+    }
+    #[test]
+    fn should_parse_tokens_consisting_of_a_float_atom_and_convert_it_to_a_parse_item() {
+        let tokens = &mut tokenize(~"1.1");
+        let parsed_item = parse(tokens);
+        println!("{:?}", parsed_item);
+        match parsed_item {
+            Atom(Float(val)) => {
+                assert_eq!(val, 1.1)
             },
             _ => assert!(false)
         }
