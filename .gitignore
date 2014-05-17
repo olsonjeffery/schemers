@@ -98,4 +98,5 @@ i686-pc-mingw32/
 /src/sdl2
 /src/rust-sdl2
 /schemers
+/main
 /data
