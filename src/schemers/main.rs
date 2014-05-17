@@ -22,8 +22,7 @@ fn main() {
     }
     let program: ~str = args.move_iter()
         .fold(~"", |memo, arg| memo + arg + " ").trim().to_owned();
-    let tokens = &mut tokenize(program);
-    let parsed_items = parse(tokens);
+    let parsed_items = parse_str(program);
     println!("{}", parsed_items.print());
 }
 
@@ -41,7 +40,7 @@ fn tokenize(input: ~str) -> Vec<~str> {
         .filter(|i| *i != "").map(|i| i.to_owned()).collect()
 }
 
-#[deriving(Eq, Show)]
+#[deriving(Eq, Show, Clone)]
 pub enum Expr {
     Atom(AtomType),
     List(Vec<~Expr>)
@@ -103,7 +102,7 @@ impl Expr {
     }
 }
 
-#[deriving(Eq, Show)]
+#[deriving(Eq, Show, Clone)]
 pub enum AtomType {
     Symbol(~str),
     Integer(i64),
