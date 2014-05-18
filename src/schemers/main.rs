@@ -50,6 +50,7 @@ pub enum AtomVal {
 fn eval(expr: Expr, env: Env) -> (Expr, Env) {
     match expr {
         Atom(Symbol(ref var_name)) => (env.find(var_name), env),
+        val @ Atom(_) => (val, env),
         _ => fail!("un-implemented case")
     }
 }
@@ -106,7 +107,7 @@ impl Env {
         }
         Env { entries: entries, outer: outer }
     }
-    
+
     pub fn find(&self, symbol: &~str) -> Expr {
         match self.entries.find(symbol) {
             Some(expr) => expr.clone(),
@@ -314,7 +315,8 @@ mod parser_test {
 #[cfg(test)]
 mod eval_test {
     mod un_cons {
-        use super::super::{parse_str, Atom, List, Symbol, Integer, Env, eval};
+        use super::super::{parse_str, Atom, List, Symbol, Integer, Float,
+                           Env, eval};
         #[test]
         fn an_atom_expr_returns_the_atom_in_the_car_with_none_in_the_cdr() {
             let expr = parse_str(~"x");
@@ -353,9 +355,9 @@ mod eval_test {
             let expr = parse_str(~"()");
             expr.un_cons();
         }
-        
+
         #[test]
-        fn given_a_symbol_in_the_env_then_calling_eval_should_return_it() {
+        fn given_a_symbol_in_the_env_then_calling_eval_should_resolve_its_value() {
             let env = Env::new(
                 Some(vec!(~"x")),
                 Some(vec!(Atom(Integer(42)))),
@@ -371,6 +373,22 @@ mod eval_test {
             let env = Env::new(None, None, None);
             let in_expr = parse_str(~"x");
             eval(in_expr, env);
+        }
+
+        #[test]
+        fn given_a_float_literal_then_calling_eval_should_return_it_back() {
+            let env = Env::new(None, None, None);
+            let in_expr = parse_str(~"34.3");
+            let (out_expr, _) = eval(in_expr, env);
+            assert_eq!(out_expr, Atom(Float(34.3)));
+        }
+
+        #[test]
+        fn given_a_integer_literal_then_calling_eval_should_return_it_back() {
+            let env = Env::new(None, None, None);
+            let in_expr = parse_str(~"34");
+            let (out_expr, _) = eval(in_expr, env);
+            assert_eq!(out_expr, Atom(Integer(34)));
         }
     }
 
