@@ -161,13 +161,6 @@ impl Expr {
         }
     }
 
-    pub fn is_atom(&self) -> bool {
-        match *self {
-            Atom(_) => true,
-            _ => false
-        }
-    }
-
     pub fn print(&self) -> ~str {
         match self {
             &List(ref items) => {
@@ -189,6 +182,21 @@ impl Expr {
                     .expect("at least one item in the least; shouldn't happen");
                 (*car, List(items))
             }
+        }
+    }
+
+    // type-evaluating built-ins
+    pub fn is_atom(&self) -> bool {
+        match *self {
+            Atom(_) => true,
+            _ => false
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        match *self {
+            List(ref items) => items.len() == 0,
+            _ => false
         }
     }
 }
@@ -435,6 +443,22 @@ mod eval_test {
             },
             _ => fail!("expected a list")
         }
+    }
+
+    #[test]
+    fn only_an_empty_list_expr_should_have_is_null_return_true() {
+        let empty_list = parse_str(~"()");
+        assert_eq!(empty_list.is_null(), true);
+        let not_null = parse_str(~"(())");
+        assert_eq!(not_null.is_null(), false);
+        let not_null = parse_str(~"2");
+        assert_eq!(not_null.is_null(), false);
+        let not_null = parse_str(~"x");
+        assert_eq!(not_null.is_null(), false);
+        let not_null = parse_str(~"34.4");
+        assert_eq!(not_null.is_null(), false);
+        let not_null = parse_str(~"(x 3 4)");
+        assert_eq!(not_null.is_null(), false);
     }
 
     mod env_tests {
