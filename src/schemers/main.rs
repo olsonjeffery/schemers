@@ -1,4 +1,4 @@
-// Copyright 2013-2014 Jeffery Olson
+// Copyright 2014 Jeffery Olson
 //
 // Licensed under the 3-Clause BSD License, see LICENSE.txt
 // at the top-level of this repository.
