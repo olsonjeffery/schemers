@@ -49,6 +49,7 @@ pub enum AtomVal {
 
 fn eval(expr: Expr, env: Env) -> (Expr, Env) {
     match expr {
+        // Atom values and values in the Env
         Atom(Symbol(ref var_name)) => (env.find(var_name), env),
         val @ Atom(_) => (val, env),
         _ => fail!("un-implemented case")
@@ -166,7 +167,7 @@ impl Expr {
     }
     pub fn un_cons(self) -> (Expr, Option<Expr>) {
         match self {
-            Atom(v) => (Atom(v), None),
+            Atom(_) => fail!("Cannot un_cons an Atom value"),
             List(mut items) => {
                 if items.len() == 0 {
                     fail!("cannot build car/cdr of empty list");
@@ -317,12 +318,11 @@ mod eval_test {
     mod un_cons {
         use super::super::{parse_str, Atom, List, Symbol, Integer, Float,
                            Env, eval};
+        #[should_fail]
         #[test]
         fn an_atom_expr_returns_the_atom_in_the_car_with_none_in_the_cdr() {
             let expr = parse_str(~"x");
-            let (car, cdr) = expr.un_cons();
-            assert_eq!(car, Atom(Symbol(~"x")));
-            assert_eq!(cdr, None);
+            expr.un_cons();
         }
 
         #[test]
@@ -337,7 +337,7 @@ mod eval_test {
         }
 
         #[test]
-        fn a_list_with_multiple_elements_returns_the_first_car_and_the_rust_in_the_cdr() {
+        fn a_list_with_multiple_elems_puts_the_first_the_car_and_the_rest_in_the_cdr() {
             let expr = parse_str(~"(y 2 3)");
             let (car, cdr) = expr.un_cons();
             assert_eq!(car, Atom(Symbol(~"y")));
@@ -351,7 +351,7 @@ mod eval_test {
 
         #[test]
         #[should_fail]
-        fn calling_extract_on_an_empty_list_should_fail() {
+        fn calling_un_cons_on_an_empty_list_should_fail() {
             let expr = parse_str(~"()");
             expr.un_cons();
         }
