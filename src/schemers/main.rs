@@ -47,47 +47,65 @@ pub enum AtomVal {
     Float(f64)
 }
 
-fn eval(expr: Expr, env: Env) -> (Expr, Env) {
+fn eval(expr: Expr, env: &mut Env) -> Option<Expr> {
     println!("entering eval(), expr val: {}", expr);
     println!("entering eval(), expr print: {}", expr.print());
     match expr {
         // Atom values and values in the Env
-        Atom(Symbol(ref var_name)) => (env.find(var_name), env),
-        val @ Atom(_) => (val, env),
+        Atom(Symbol(ref var_name)) =>
+            Some(env.find_scope(var_name).get(var_name).clone()),
+        val @ Atom(_) => Some(val),
         list @ List(_) => {
             if list.is_null() {
-                return (list, env);
+                return Some(list);
             }
             let (car, cdr) = list.un_cons();
-            println!("{}", car);
             match car {
 
                 Atom(ref val) if *val == Symbol(~"quote")  => {
                     match cdr {
                         List(mut items) => {
-                            (*items.shift().expect("eval: quote list shouldnt be empty"), env)
+                            Some(*items.shift().expect("eval: quote list shouldnt be empty"))
                         },
                         _ => fail!("eval: quote: expected List in cdr position")
                     }
                 },
                 Atom(ref val) if *val == Symbol(~"if") => {
-                    println!("hit if branch in eval");
                     match cdr {
                         List(mut items) => {
                             if items.len() != 3 {
                                 fail!("eval: if: expect three entries in if cdr list");
                             }
-                            println!("eval'ing test expr");
-                            let (test_result, env) = eval(
-                                *items.shift().unwrap(), env);
-                            println!("after eval test expr, result: {}", test_result.is_null());
-                            if test_result.is_null() == false {
-                                eval(*items.shift().unwrap(), env)
-                            } else {
-                                eval(*items.pop().unwrap(), env)
+                            match eval(
+                                *items.shift().unwrap(), env) {
+                                Some(test_result) => {
+                                    if test_result.is_null() == false {
+                                        eval(*items.shift().unwrap(), env)
+                                    } else {
+                                        eval(*items.pop().unwrap(), env)
+                                    }
+                                }, None => eval(*items.shift().unwrap(), env)
                             }
                         },
                         _ => fail!("eval: if: expected List in cdr position")
+                    }
+                },
+                Atom(ref val) if *val == Symbol(~"set!") => {
+                    match cdr {
+                        List(mut items) => {
+                            if items.len() != 2 {
+                                fail!("eval: set!: expected two entries");
+                            }
+                            match *items.shift().expect("eval: set!: var name should have value") {
+                                Atom(Symbol(name)) => {
+                                    env.set(name,
+                                      *items.pop().expect("eval: set!: value should be there"));
+                                    None
+                                },
+                                _ => fail!("eval: set!: atom in var name position must be symbol")
+                            }
+                        },
+                        _ => fail!("eval: set!: expected list in cdr position")
                     }
                 },
                 _ => fail!("un-implemented case of eval")
@@ -148,13 +166,23 @@ impl Env {
         }
         Env { entries: entries, outer: outer }
     }
+    
+    pub fn set(&mut self, symbol: ~str, val: Expr) {
+        match self.entries.contains_key(&symbol) {
+            true => { self.entries.insert(symbol, val); },
+            false => match self.outer {
+                Some(ref mut outer_env) => outer_env.set(symbol, val),
+                None => fail!("Symbol '{}' is not defined in this Env scope chain")
+            }
+        }
+    }
 
-    pub fn find(&self, symbol: &~str) -> Expr {
+    pub fn find_scope<'a>(&'a self, symbol: &~str) -> &'a HashMap<~str, Expr>{
         match self.entries.find(symbol) {
-            Some(expr) => expr.clone(),
+            Some(_) => &self.entries,
             None => {
                 match &self.outer {
-                    &Some(ref outer_env) => outer_env.find(symbol),
+                    &Some(ref outer_env) => outer_env.find_scope(symbol),
                     &None => fail!("No variable named {} defined in the environment."
                                    , *symbol)
                 }
@@ -408,60 +436,60 @@ mod eval_test {
 
     #[test]
     fn given_a_symbol_in_the_env_then_calling_eval_should_resolve_its_value() {
-        let env = Env::new(
+        let env = &mut Env::new(
             Some(vec!(~"x")),
             Some(vec!(Atom(Integer(42)))),
             None);
         let in_expr = parse_str(~"x");
-        let (out_expr, _) = eval(in_expr, env);
+        let out_expr = eval(in_expr, env).expect("should return an expr");
         assert_eq!(out_expr, Atom(Integer(42)));
     }
 
     #[test]
     #[should_fail]
     fn given_a_symbol_NOT_in_the_env_then_calling_eval_should_fail() {
-        let env = Env::new(None, None, None);
+        let env = &mut Env::new(None, None, None);
         let in_expr = parse_str(~"x");
         eval(in_expr, env);
     }
 
     #[test]
     fn given_a_float_literal_then_calling_eval_should_return_it_back() {
-        let env = Env::new(None, None, None);
+        let env = &mut Env::new(None, None, None);
         let in_expr = parse_str(~"34.3");
-        let (out_expr, _) = eval(in_expr, env);
+        let out_expr = eval(in_expr, env).expect("should return an expr");
         assert_eq!(out_expr, Atom(Float(34.3)));
     }
 
     #[test]
     fn given_a_integer_literal_then_calling_eval_should_return_it_back() {
-        let env = Env::new(None, None, None);
+        let env = &mut Env::new(None, None, None);
         let in_expr = parse_str(~"34");
-        let (out_expr, _) = eval(in_expr, env);
+        let out_expr = eval(in_expr, env).expect("should return an expr");
         assert_eq!(out_expr, Atom(Integer(34)));
     }
 
     #[test]
     fn given_a_quote_of_an_atom_expr_should_resolve_to_just_the_atom() {
-        let env = Env::new(None, None, None);
+        let env = &mut Env::new(None, None, None);
         let in_expr = parse_str(~"(quote 42)");
-        let (out_expr, _) = eval(in_expr, env);
+        let out_expr = eval(in_expr, env).expect("should return an expr");
         assert_eq!(out_expr, Atom(Integer(42)));
     }
 
     #[test]
     #[should_fail]
     fn a_quote_with_no_params_should_fail() {
-        let env = Env::new(None, None, None);
+        let env = &mut Env::new(None, None, None);
         let in_expr = parse_str(~"(quote)");
         eval(in_expr, env);
     }
 
     #[test]
     fn given_a_quote_of_a_list_expr_it_should_resolve_to_the_list_without_resolving_symbols() {
-        let env = Env::new(None, None, None);
+        let env = &mut Env::new(None, None, None);
         let in_expr = parse_str(~"(quote (x 37))");
-        let (out_expr, _) = eval(in_expr, env);
+        let out_expr = eval(in_expr, env).expect("should return an expr");
         match out_expr {
             List(items) => {
                 assert_eq!(items.len(), 2);
@@ -490,31 +518,82 @@ mod eval_test {
 
     #[test]
     fn an_if_call_with_a_non_null_test_should_resolve_the_conseq_branch() {
-        let env = Env::new(None, None, None);
+        let env = &mut Env::new(None, None, None);
         let in_expr = parse_str(~"(if (quote 1) (quote conseq) (quote alt))");
-        let (out_expr, _) = eval(in_expr, env);
+        let out_expr = eval(in_expr, env).expect("should return an Expr");
         assert_eq!(out_expr, Atom(Symbol(~"conseq")));
     }
 
     #[test]
     fn an_if_call_with_a_null_test_should_resolve_the_alt_branch() {
-        let env = Env::new(None, None, None);
+        let env = &mut Env::new(None, None, None);
         let in_expr = parse_str(~"(if (quote ()) (quote conseq) (quote alt))");
-        let (out_expr, _) = eval(in_expr, env);
+        let out_expr = eval(in_expr, env).expect("should return an expr");
         assert_eq!(out_expr, Atom(Symbol(~"alt")));
     }
 
     #[test]
     fn calling_eval_with_an_empty_list_should_return_the_list_as_a_value() {
-        let env = Env::new(None, None, None);
+        let env = &mut Env::new(None, None, None);
         let in_expr = parse_str(~"()");
-        let (out_expr, _) = eval(in_expr, env);
+        let out_expr = eval(in_expr, env).expect("should return an expr");
         match out_expr {
             list @ List(_) => {
                assert_eq!(list.is_null(), true);
             },
             _ => fail!("expect a list")
         }
+    }
+
+    #[test]
+    #[should_fail]
+    fn calling_set_on_a_var_not_in_the_scope_should_fail() {
+        let env = &mut Env::new(None, None, None);
+        let in_expr = parse_str(~"(set! x 123)");
+        eval(in_expr, env);
+    }
+
+    #[test]
+    fn calling_set_on_a_var_in_the_scope_should_succeed() {
+        let env = &mut Env::new(
+            Some(vec!(~"x")), Some(vec!(Atom(Integer(42)))),
+            None);
+        let in_expr = parse_str(~"(set! x 123)");
+        eval(in_expr, env);
+        assert_eq!(env.find_scope(&~"x").get(&~"x"), &Atom(Integer(123)));
+    }
+
+    #[test]
+    fn calling_set_on_a_var_in_an_outer_scope_should_succeed() {
+        let outer_env = Env::new(
+            Some(vec!(~"x")), Some(vec!(Atom(Integer(42)))),
+            None);
+        let env = &mut Env::new(
+            None, None,
+            Some(~outer_env));
+        let in_expr = parse_str(~"(set! x 43)");
+        eval(in_expr, env);
+        assert_eq!(env.find_scope(&~"x").get(&~"x"), &Atom(Integer(43)));
+    }
+
+    #[test]
+    fn set_should_return_a_None_for_the_out_expr() {
+        let env = &mut Env::new(
+            Some(vec!(~"x")), Some(vec!(Atom(Integer(42)))),
+            None);
+        let in_expr = parse_str(~"(set! x 43)");
+        let result = eval(in_expr, env);
+        assert_eq!(result, None);
+    }
+    #[test]
+    fn an_if_test_that_returns_a_None_out_expr_should_run_the_conseq_branch() {
+        let env = &mut Env::new(
+            Some(vec!(~"x")), Some(vec!(Atom(Integer(42)))),
+            None);
+        let in_expr = parse_str(~"(if (set! x 37) (quote conseq) (quote alt))");
+        let out_expr = eval(in_expr, env).expect("should return an Expr");
+        assert_eq!(out_expr, Atom(Symbol(~"conseq")));
+        assert_eq!(env.find_scope(&~"x").get(&~"x"), &Atom(Integer(37)));
     }
 
     mod env_tests {
