@@ -8,7 +8,10 @@
 #![desc = "Simple Scheme Interpreter"]
 #![license = "3-Clause BSD"]
 
+extern crate collections = "collections";
+
 use std::from_str::FromStr;
+use collections::hashmap::HashMap;
 
 // this is starting out as a straight port of Peter Norvig's
 // lis.py (the first iteration) to Rust
@@ -26,7 +29,24 @@ fn main() {
     println!("{}", parsed_items.print());
 }
 
-// parser impl
+pub struct Env {
+    entries: HashMap<~str, Expr>,
+    outer: Option<~Env>
+}
+
+#[deriving(Eq, Show, Clone)]
+pub enum Expr {
+    Atom(AtomVal),
+    List(Vec<~Expr>)
+}
+
+#[deriving(Eq, Show, Clone)]
+pub enum AtomVal {
+    Symbol(~str),
+    Integer(i64),
+    Float(f64)
+}
+
 fn parse_str(input: ~str) -> Expr {
     parse(&mut tokenize(input))
 }
@@ -40,11 +60,47 @@ fn tokenize(input: ~str) -> Vec<~str> {
         .filter(|i| *i != "").map(|i| i.to_owned()).collect()
 }
 
-#[deriving(Eq, Show, Clone)]
-pub enum Expr {
-    Atom(AtomType),
-    List(Vec<~Expr>)
+fn parse(tokens: &mut Vec<~str>) -> Expr {
+    let current_token =
+        tokens.shift().expect("calling parse() w/ empty token list; shouldn't happen");
+    match current_token {
+        ref x if *x == ~"(" => {
+            let mut list = Vec::new();
+            while *tokens.get(0) != ~")" {
+                list.push(box parse(tokens));
+            }
+            tokens.shift();
+            List(list)
+        },
+        ref x if *x == ~")" => fail!("hit ) token; shouldn't happen"),
+        x => Expr::new_atom(x)
+    }
 }
+
+impl Env {
+    pub fn new(params: Option<Vec<~str>>, args: Option<Vec<Expr>>, outer: Option<~Env>) -> Env {
+        let mut entries = HashMap::new();
+        if params.is_some() && args.is_some() {
+            let params = params.expect("params should be a value");
+            let args = args.expect("args should be a value");
+            if params.len() == args.len() {
+                for ctr in range(0,params.len()) {
+                    entries.insert(params.get(ctr).to_owned(),
+                                   args.get(ctr).clone());
+                }
+            } else {
+                fail!("params and args length doesn't match")
+            }
+        }
+        else if params.is_none() && args.is_none() {
+            // do nothing!
+        } else {
+            fail!("cannot have params & args unset")
+        }
+        Env { entries: entries, outer: outer }
+    }
+}
+
 impl Expr {
     pub fn new_atom(input: ~str) -> Expr {
         let first_char = input.char_at(0);
@@ -102,37 +158,13 @@ impl Expr {
     }
 }
 
-#[deriving(Eq, Show, Clone)]
-pub enum AtomType {
-    Symbol(~str),
-    Integer(i64),
-    Float(f64)
-}
-
-impl AtomType {
+impl AtomVal {
     pub fn print(&self) -> ~str {
         match self {
             &Symbol(ref v) => v.to_owned(),
             &Integer(ref v) => v.to_str(),
             &Float(ref v) => v.to_str()
         }
-    }
-}
-
-fn parse(tokens: &mut Vec<~str>) -> Expr {
-    let current_token =
-        tokens.shift().expect("calling parse() w/ empty token list; shouldn't happen");
-    match current_token {
-        ref x if *x == ~"(" => {
-            let mut list = Vec::new();
-            while *tokens.get(0) != ~")" {
-                list.push(box parse(tokens));
-            }
-            tokens.shift();
-            List(list)
-        },
-        ref x if *x == ~")" => fail!("hit ) token; shouldn't happen"),
-        x => Expr::new_atom(x)
     }
 }
 
@@ -300,6 +332,15 @@ mod eval_test {
         fn calling_extract_on_an_empty_list_should_fail() {
             let expr = parse_str(~"()");
             expr.un_cons();
+        }
+    }
+
+    mod env_tests {
+        use super::super::{Env};
+
+        #[test]
+        fn a_new_env_with_no_parent_params_or_vars_should_be_set_up_empty() {
+            let _env = Env::new(None, None, None);
         }
     }
 }
