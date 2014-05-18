@@ -9,7 +9,7 @@
 # except according to those terms.
 
 license1 = """// Copyright """
-license2 = """ 2013-2014 Jeffery Olson
+license2 = """ 2014 Jeffery Olson
 //
 // Licensed under the 3-Clause BSD License, see LICENSE.txt
 // at the top-level of this repository.

@@ -48,19 +48,46 @@ pub enum AtomVal {
 }
 
 fn eval(expr: Expr, env: Env) -> (Expr, Env) {
+    println!("entering eval(), expr val: {}", expr);
+    println!("entering eval(), expr print: {}", expr.print());
     match expr {
         // Atom values and values in the Env
         Atom(Symbol(ref var_name)) => (env.find(var_name), env),
         val @ Atom(_) => (val, env),
         list @ List(_) => {
+            if list.is_null() {
+                return (list, env);
+            }
             let (car, cdr) = list.un_cons();
+            println!("{}", car);
             match car {
+
                 Atom(ref val) if *val == Symbol(~"quote")  => {
                     match cdr {
                         List(mut items) => {
                             (*items.shift().expect("eval: quote list shouldnt be empty"), env)
                         },
-                        _ => fail!("eval: expected List in cdr position")
+                        _ => fail!("eval: quote: expected List in cdr position")
+                    }
+                },
+                Atom(ref val) if *val == Symbol(~"if") => {
+                    println!("hit if branch in eval");
+                    match cdr {
+                        List(mut items) => {
+                            if items.len() != 3 {
+                                fail!("eval: if: expect three entries in if cdr list");
+                            }
+                            println!("eval'ing test expr");
+                            let (test_result, env) = eval(
+                                *items.shift().unwrap(), env);
+                            println!("after eval test expr, result: {}", test_result.is_null());
+                            if test_result.is_null() == false {
+                                eval(*items.shift().unwrap(), env)
+                            } else {
+                                eval(*items.pop().unwrap(), env)
+                            }
+                        },
+                        _ => fail!("eval: if: expected List in cdr position")
                     }
                 },
                 _ => fail!("un-implemented case of eval")
@@ -459,6 +486,35 @@ mod eval_test {
         assert_eq!(not_null.is_null(), false);
         let not_null = parse_str(~"(x 3 4)");
         assert_eq!(not_null.is_null(), false);
+    }
+
+    #[test]
+    fn an_if_call_with_a_non_null_test_should_resolve_the_conseq_branch() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"(if (quote 1) (quote conseq) (quote alt))");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr, Atom(Symbol(~"conseq")));
+    }
+
+    #[test]
+    fn an_if_call_with_a_null_test_should_resolve_the_alt_branch() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"(if (quote ()) (quote conseq) (quote alt))");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr, Atom(Symbol(~"alt")));
+    }
+
+    #[test]
+    fn calling_eval_with_an_empty_list_should_return_the_list_as_a_value() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"()");
+        let (out_expr, _) = eval(in_expr, env);
+        match out_expr {
+            list @ List(_) => {
+               assert_eq!(list.is_null(), true);
+            },
+            _ => fail!("expect a list")
+        }
     }
 
     mod env_tests {
