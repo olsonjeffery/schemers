@@ -52,7 +52,20 @@ fn eval(expr: Expr, env: Env) -> (Expr, Env) {
         // Atom values and values in the Env
         Atom(Symbol(ref var_name)) => (env.find(var_name), env),
         val @ Atom(_) => (val, env),
-        _ => fail!("un-implemented case")
+        list @ List(_) => {
+            let (car, cdr) = list.un_cons();
+            match car {
+                Atom(ref val) if *val == Symbol(~"quote")  => {
+                    match cdr {
+                        List(mut items) => {
+                            (*items.shift().expect("eval: quote list shouldnt be empty"), env)
+                        },
+                        _ => fail!("eval: expected List in cdr position")
+                    }
+                },
+                _ => fail!("un-implemented case of eval")
+            }
+        }
     }
 }
 
@@ -116,7 +129,7 @@ impl Env {
                 match &self.outer {
                     &Some(ref outer_env) => outer_env.find(symbol),
                     &None => fail!("No variable named {} defined in the environment."
-                                  , *symbol)
+                                   , *symbol)
                 }
             }
         }
@@ -165,7 +178,7 @@ impl Expr {
             &Atom(ref v) => v.print()
         }
     }
-    pub fn un_cons(self) -> (Expr, Option<Expr>) {
+    pub fn un_cons(self) -> (Expr, Expr) {
         match self {
             Atom(_) => fail!("Cannot un_cons an Atom value"),
             List(mut items) => {
@@ -174,7 +187,7 @@ impl Expr {
                 }
                 let car = items.shift()
                     .expect("at least one item in the least; shouldn't happen");
-                (*car, Some(List(items)))
+                (*car, List(items))
             }
         }
     }
@@ -315,9 +328,10 @@ mod parser_test {
 
 #[cfg(test)]
 mod eval_test {
+    use super::{parse_str, Atom, List, Symbol, Integer, Float,
+                       Env, eval};
     mod un_cons {
-        use super::super::{parse_str, Atom, List, Symbol, Integer, Float,
-                           Env, eval};
+        use super::super::{parse_str, Atom, List, Symbol};
         #[should_fail]
         #[test]
         fn an_atom_expr_returns_the_atom_in_the_car_with_none_in_the_cdr() {
@@ -330,7 +344,7 @@ mod eval_test {
             let expr = parse_str(~"(x)");
             let (car, cdr) = expr.un_cons();
             assert_eq!(car, Atom(Symbol(~"x")));
-            match cdr.expect("should be a value here") {
+            match cdr {
                 List(items) => assert_eq!(items.len(), 0),
                 _ => fail!("expected a list")
             }
@@ -341,7 +355,7 @@ mod eval_test {
             let expr = parse_str(~"(y 2 3)");
             let (car, cdr) = expr.un_cons();
             assert_eq!(car, Atom(Symbol(~"y")));
-            match cdr.expect("should be a value here") {
+            match cdr {
                 List(items) => {
                     assert_eq!(items.len(), 2)
                 },
@@ -355,40 +369,71 @@ mod eval_test {
             let expr = parse_str(~"()");
             expr.un_cons();
         }
+    }
 
-        #[test]
-        fn given_a_symbol_in_the_env_then_calling_eval_should_resolve_its_value() {
-            let env = Env::new(
-                Some(vec!(~"x")),
-                Some(vec!(Atom(Integer(42)))),
-                None);
-            let in_expr = parse_str(~"x");
-            let (out_expr, _) = eval(in_expr, env);
-            assert_eq!(out_expr, Atom(Integer(42)));
-        }
+    #[test]
+    fn given_a_symbol_in_the_env_then_calling_eval_should_resolve_its_value() {
+        let env = Env::new(
+            Some(vec!(~"x")),
+            Some(vec!(Atom(Integer(42)))),
+            None);
+        let in_expr = parse_str(~"x");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr, Atom(Integer(42)));
+    }
 
-        #[test]
-        #[should_fail]
-        fn given_a_symbol_NOT_in_the_env_then_calling_eval_should_fail() {
-            let env = Env::new(None, None, None);
-            let in_expr = parse_str(~"x");
-            eval(in_expr, env);
-        }
+    #[test]
+    #[should_fail]
+    fn given_a_symbol_NOT_in_the_env_then_calling_eval_should_fail() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"x");
+        eval(in_expr, env);
+    }
 
-        #[test]
-        fn given_a_float_literal_then_calling_eval_should_return_it_back() {
-            let env = Env::new(None, None, None);
-            let in_expr = parse_str(~"34.3");
-            let (out_expr, _) = eval(in_expr, env);
-            assert_eq!(out_expr, Atom(Float(34.3)));
-        }
+    #[test]
+    fn given_a_float_literal_then_calling_eval_should_return_it_back() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"34.3");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr, Atom(Float(34.3)));
+    }
 
-        #[test]
-        fn given_a_integer_literal_then_calling_eval_should_return_it_back() {
-            let env = Env::new(None, None, None);
-            let in_expr = parse_str(~"34");
-            let (out_expr, _) = eval(in_expr, env);
-            assert_eq!(out_expr, Atom(Integer(34)));
+    #[test]
+    fn given_a_integer_literal_then_calling_eval_should_return_it_back() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"34");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr, Atom(Integer(34)));
+    }
+
+    #[test]
+    fn given_a_quote_of_an_atom_expr_should_resolve_to_just_the_atom() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"(quote 42)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr, Atom(Integer(42)));
+    }
+
+    #[test]
+    #[should_fail]
+    fn a_quote_with_no_params_should_fail() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"(quote)");
+        eval(in_expr, env);
+    }
+
+    #[test]
+    fn given_a_quote_of_a_list_expr_it_should_resolve_to_the_list_without_resolving_symbols() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"(quote (x 37))");
+        let (out_expr, _) = eval(in_expr, env);
+        match out_expr {
+            List(items) => {
+                assert_eq!(items.len(), 2);
+                assert_eq!(*items.get(0), ~Atom(Symbol(~"x")));
+                assert_eq!(*items.get(1), ~Atom(Integer(37)));
+            },
+            _ => fail!("expected a list")
         }
     }
 
