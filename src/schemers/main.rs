@@ -48,8 +48,6 @@ pub enum AtomVal {
 }
 
 fn eval<'env>(expr: Expr, env: &mut Env<'env>) -> Option<Expr> {
-    println!("entering eval(), expr val: {}", expr);
-    println!("entering eval(), expr print: {}", expr.print());
     match expr {
         // Atom values and values in the Env
         Atom(Symbol(ref var_name)) => {
@@ -295,7 +293,6 @@ mod parser_test {
     fn should_parse_tokens_consisting_of_a_str_atom_and_convert_it_to_a_parse_item() {
         let tokens = &mut tokenize(~"bar");
         let parsed_item = parse(tokens);
-        println!("{:?}", parsed_item);
         match parsed_item {
             Atom(Symbol(val)) => {
                 assert_eq!(val, ~"bar")
@@ -307,7 +304,6 @@ mod parser_test {
     fn should_parse_tokens_consisting_of_an_int_atom_and_convert_it_to_a_parse_item() {
         let tokens = &mut tokenize(~"42");
         let parsed_item = parse(tokens);
-        println!("{:?}", parsed_item);
         match parsed_item {
             Atom(Integer(val)) => {
                 assert_eq!(val, 42)
@@ -319,7 +315,6 @@ mod parser_test {
     fn should_parse_tokens_consisting_of_a_float_atom_and_convert_it_to_a_parse_item() {
         let tokens = &mut tokenize(~"1.1");
         let parsed_item = parse(tokens);
-        println!("{:?}", parsed_item);
         match parsed_item {
             Atom(Float(val)) => {
                 assert_eq!(val, 1.1)
@@ -604,12 +599,8 @@ mod eval_test {
         assert_eq!(env.find(&~"x"), Atom(Integer(37)));
     }
 
-    mod env_tests {
-        use super::super::{Env};
-
-        #[test]
-        fn a_new_env_with_no_parent_params_or_vars_should_be_set_up_empty() {
-            let _env = Env::new(None, None, None);
-        }
+    #[test]
+    fn a_new_env_with_no_parent_params_or_vars_should_be_set_up_empty() {
+        let _env = Env::new(None, None, None);
     }
 }
