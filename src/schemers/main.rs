@@ -47,6 +47,13 @@ pub enum AtomVal {
     Float(f64)
 }
 
+fn eval(expr: Expr, env: Env) -> (Expr, Env) {
+    match expr {
+        Atom(Symbol(ref var_name)) => (env.find(var_name), env),
+        _ => fail!("un-implemented case")
+    }
+}
+
 fn parse_str(input: ~str) -> Expr {
     parse(&mut tokenize(input))
 }
@@ -98,6 +105,19 @@ impl Env {
             fail!("cannot have params & args unset")
         }
         Env { entries: entries, outer: outer }
+    }
+    
+    pub fn find(&self, symbol: &~str) -> Expr {
+        match self.entries.find(symbol) {
+            Some(expr) => expr.clone(),
+            None => {
+                match &self.outer {
+                    &Some(ref outer_env) => outer_env.find(symbol),
+                    &None => fail!("No variable named {} defined in the environment."
+                                  , *symbol)
+                }
+            }
+        }
     }
 }
 
@@ -294,7 +314,7 @@ mod parser_test {
 #[cfg(test)]
 mod eval_test {
     mod un_cons {
-        use super::super::{parse_str, Atom, List, Symbol};
+        use super::super::{parse_str, Atom, List, Symbol, Integer, Env, eval};
         #[test]
         fn an_atom_expr_returns_the_atom_in_the_car_with_none_in_the_cdr() {
             let expr = parse_str(~"x");
@@ -332,6 +352,25 @@ mod eval_test {
         fn calling_extract_on_an_empty_list_should_fail() {
             let expr = parse_str(~"()");
             expr.un_cons();
+        }
+        
+        #[test]
+        fn given_a_symbol_in_the_env_then_calling_eval_should_return_it() {
+            let env = Env::new(
+                Some(vec!(~"x")),
+                Some(vec!(Atom(Integer(42)))),
+                None);
+            let in_expr = parse_str(~"x");
+            let (out_expr, _) = eval(in_expr, env);
+            assert_eq!(out_expr, Atom(Integer(42)));
+        }
+
+        #[test]
+        #[should_fail]
+        fn given_a_symbol_NOT_in_the_env_then_calling_eval_should_fail() {
+            let env = Env::new(None, None, None);
+            let in_expr = parse_str(~"x");
+            eval(in_expr, env);
         }
     }
 
