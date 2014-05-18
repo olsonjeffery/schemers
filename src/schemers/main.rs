@@ -11,7 +11,6 @@
 extern crate collections = "collections";
 
 use std::from_str::FromStr;
-use std::cell::{RefCell};
 use collections::hashmap::HashMap;
 
 // this is starting out as a straight port of Peter Norvig's
@@ -48,13 +47,13 @@ pub enum AtomVal {
     Float(f64)
 }
 
-fn eval<'a>(expr: Expr, env: &'a mut Env<'a>) -> Option<Expr> {
+fn eval<'env>(expr: Expr, env: &mut Env<'env>) -> Option<Expr> {
     println!("entering eval(), expr val: {}", expr);
     println!("entering eval(), expr print: {}", expr.print());
     match expr {
         // Atom values and values in the Env
         Atom(Symbol(ref var_name)) => {
-            let out_val = env.find_scope(var_name).get(var_name);
+            let out_val = env.find(var_name);
             Some(out_val.clone())
         },
         val @ Atom(_) => Some(val),
@@ -172,7 +171,7 @@ impl<'a> Env<'a> {
         }
         Env { entries: entries, outer: outer }
     }
-    
+
     pub fn set(&mut self, symbol: ~str, val: Expr) {
         match self.entries.contains_key(&symbol) {
             true => { self.entries.insert(symbol, val); },
@@ -183,12 +182,12 @@ impl<'a> Env<'a> {
         }
     }
 
-    pub fn find_scope(&'a self, symbol: &~str) -> &'a HashMap<~str, Expr>{
+    pub fn find<'b>(&'b self, symbol: &~str) -> Expr {
         match self.entries.find(symbol) {
-            Some(_) => &self.entries,
+            Some(v) => v.clone(),
             None => {
                 match &self.outer {
-                    &Some(ref outer_env) => outer_env.find_scope(symbol),
+                    &Some(ref outer_env) => outer_env.find(symbol),
                     &None => fail!("No variable named {} defined in the environment."
                                    , *symbol)
                 }
@@ -566,7 +565,7 @@ mod eval_test {
             None);
         let in_expr = parse_str(~"(set! x 123)");
         eval(in_expr, env);
-        assert_eq!(env.find_scope(&~"x").get(&~"x"), &Atom(Integer(123)));
+        assert_eq!(env.find(&~"x"), Atom(Integer(123)));
     }
 
     #[test]
@@ -579,7 +578,7 @@ mod eval_test {
             Some(outer_env));
         let in_expr = parse_str(~"(set! x 43)");
         eval(in_expr, env);
-        assert_eq!(env.find_scope(&~"x").get(&~"x"), &Atom(Integer(43)));
+        assert_eq!(env.find(&~"x"), Atom(Integer(43)));
     }
 
     #[test]
@@ -591,18 +590,18 @@ mod eval_test {
         let result = eval(in_expr, env);
         assert_eq!(result, None);
     }
+
     #[test]
     fn an_if_test_that_returns_a_None_out_expr_should_run_the_conseq_branch() {
         let mut env = Env::new(
             Some(vec!(~"x")), Some(vec!(Atom(Integer(42)))),
             None);
         let in_expr = parse_str(~"(if (set! x 37) (quote conseq) (quote alt))");
-        let out_expr = { 
-            let env_borrow = &mut env;
-            eval(in_expr, env_borrow).expect("should return an Expr")
+        let out_expr = {
+            eval(in_expr, &mut env).expect("should return an Expr")
         };
         assert_eq!(out_expr, Atom(Symbol(~"conseq")));
-        assert_eq!(env.find_scope(&~"x").get(&~"x"), &Atom(Integer(37)));
+        assert_eq!(env.find(&~"x"), Atom(Integer(37)));
     }
 
     mod env_tests {
