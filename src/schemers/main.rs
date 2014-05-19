@@ -99,9 +99,11 @@ fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                             match *items.shift().expect("eval: set!: var name should have value") {
                                 Atom(Symbol(name)) => {
                                     let (val_expr, mut env) =
-                                        eval(*items.pop().expect("eval: set! val not provided"), env);
+                                        eval(*items.pop()
+                                             .expect("eval: set! val not provided"), env);
                                     env.set(name,
-                                      val_expr.expect("eval: set!: provided val didn't resolve to anything"));
+                                      val_expr.expect(
+                                          "eval: set!: provided val didn't resolve to anything"));
                                     (None, env)
                                 },
                                 _ => fail!("eval: set!: atom in var name position must be symbol")
@@ -122,7 +124,8 @@ fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                                     let (val_expr, mut env) = eval(*items.pop()
                                             .expect("eval: define: value should be there"), env);
                                     env.define(name,
-                                      val_expr.expect("eval: define: val expr should return something"));
+                                      val_expr.expect(
+                                          "eval: define: val expr should return something"));
                                     (None, env)
                                 },
                                 _ => fail!("eval: define: atom in var pos. must be symbol")
@@ -195,7 +198,7 @@ impl Env {
 
     pub fn set(&mut self, symbol: ~str, val: Expr) {
         match self.entries.contains_key(&symbol) {
-            true => { 
+            true => {
                 self.define(symbol, val);
             },
             false => match self.outer {
@@ -692,5 +695,9 @@ mod eval_test {
         assert_eq!(env.find(&~"x"), Atom(Integer(37)));
         let outer_env = env.unwrap_parent();
         assert_eq!(outer_env.find(&~"x"), Atom(Integer(42)));
+    }
+
+    #[test]
+    fn foo() {
     }
 }
