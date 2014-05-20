@@ -59,7 +59,7 @@ impl LambdaVal {
         match *self {
             UserDefined(ref name, ref vars, _) => {
                 let var_expr = List(vars.iter().map(|v| ~Atom(Symbol(v.to_owned()))).collect());
-                format!("lambda{}:{}", var_expr.print(), name.to_owned())
+                format!("lambda:{}{}", name.to_owned(), var_expr.print())
             },
             BuiltIn(_, _, _) => fail!("LambdaVal.print() unimpl'd for BuiltIn")
         }
@@ -157,26 +157,7 @@ fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                     }
                 },
                 Atom(ref val) if *val == Symbol(~"define") => {
-                    match cdr {
-                        List(mut items) => {
-                            if items.len() != 2 {
-                                fail!("eval: define: expected two entries");
-                            }
-                            match *items.shift()
-                                .expect("eval: define: var name should have value") {
-                                Atom(Symbol(name)) => {
-                                    let (val_expr, mut env) = eval(*items.pop()
-                                            .expect("eval: define: value should be there"), env);
-                                    env.define(name,
-                                      val_expr.expect(
-                                          "eval: define: val expr should return something"));
-                                    (None, env)
-                                },
-                                _ => fail!("eval: define: atom in var pos. must be symbol")
-                            }
-                        },
-                        _ => fail!("eval: define: expected list in cdr position")
-                    }
+                    (None, eval_define(cdr, env))
                 },
                 Atom(ref val) if *val == Symbol(~"lambda") => {
                     (eval_lambda(~"anonymous", cdr), env)
@@ -184,6 +165,41 @@ fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                 _ => fail!("un-implemented case of eval")
             }
         }
+    }
+}
+
+fn eval_define(cdr: Expr, env: Env) -> Env {
+    match cdr {
+        List(mut items) => {
+            if items.len() != 2 {
+                fail!("eval: define: expected two entries");
+            }
+            match *items.shift()
+                .expect("eval: define: var name should have value") {
+                Atom(Symbol(name)) => {
+                    let val_expr = *items.pop().expect("eval: define: value should be there");
+                    let (val_expr, mut env) = {
+                        if val_expr.is_atom() {
+                            eval(val_expr , env)
+                        } else {
+                            let (car, cdr) = val_expr.clone().un_cons();
+                            match car {
+                                Atom(ref val) if *val == Symbol(~"lambda") => {
+                                    (eval_lambda(name.to_owned(), cdr), env)
+                                }
+                                _ => eval(val_expr , env)
+                            }
+                        }
+                    };
+                    env.define(name,
+                      val_expr.expect(
+                          "eval: define: val expr should return something"));
+                    env
+                },
+                _ => fail!("eval: define: atom in var pos. must be symbol")
+            }
+        },
+        _ => fail!("eval: define: expected list in cdr position")
     }
 }
 
@@ -804,19 +820,38 @@ mod eval_test {
                 }
             }, _ => fail!("expected atom w/ lambda")
         }
-        assert_eq!(out_expr_as_str, ~"lambda(x y):anonymous");
+        assert_eq!(out_expr_as_str, ~"lambda:anonymous(x y)");
     }
     #[test]
     fn lambda_exprs_evald_within_a_define_have_the_of_the_provided_var_symbol() {
-        fail!("unimpld");
-        // also handle print()
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"(define foo (lambda (x y) 37))");
+        let (_, env) = eval(in_expr, env);
+        let out_expr = env.find(&~"foo");
+        let out_expr_as_str = out_expr.print();
+        match out_expr {
+            Atom(Lambda(body)) => {
+                match body {
+                    UserDefined(name, _, _) => {
+                        assert_eq!(name, ~"foo");
+                    }, _ => fail!("expected a UserDefined")
+                }
+            }, _ => fail!("expected atom w/ lambda")
+        }
+        assert_eq!(out_expr_as_str, ~"lambda:foo(x y)");
     }
     #[test]
     #[should_fail]
     fn lambda_expr_eval_should_fail_if_a_list_isnt_in_the_vars_position() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"(define foo (lambda x 37))");
+        eval(in_expr, env);
     }
     #[test]
     #[should_fail]
     fn lambda_expr_eval_should_fail_if_theres_no_third_position() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"(define foo (lambda (x)))");
+        eval(in_expr, env);
     }
 }
