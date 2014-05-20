@@ -11,6 +11,7 @@
 extern crate collections = "collections";
 
 use std::from_str::FromStr;
+use std::fmt::{Show, Formatter, Result};
 use collections::hashmap::HashMap;
 
 // this is starting out as a straight port of Peter Norvig's
@@ -44,7 +45,50 @@ pub enum Expr {
 pub enum AtomVal {
     Symbol(~str),
     Integer(i64),
-    Float(f64)
+    Float(f64),
+    Lambda(LambdaVal)
+}
+
+#[deriving(Clone)]
+pub enum LambdaVal {
+    UserDefined(~str, Vec<~str>, ~Expr),
+    BuiltIn(~str, Vec<~str>, fn(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env))
+}
+impl LambdaVal {
+    pub fn print(&self) -> ~str {
+        match *self {
+            UserDefined(ref name, ref vars, _) => {
+                let var_expr = List(vars.iter().map(|v| ~Atom(Symbol(v.to_owned()))).collect());
+                format!("lambda{}:{}", var_expr.print(), name.to_owned())
+            },
+            BuiltIn(_, _, _) => fail!("LambdaVal.print() unimpl'd for BuiltIn")
+        }
+    }
+}
+impl Eq for LambdaVal {
+    // Our custom eq allows numbers which are near each other to be equal! :D
+    fn eq(&self, other: &LambdaVal) -> bool {
+        match self {
+            &UserDefined(ref name, _, ref body) => match other {
+                &UserDefined(ref other_name, _, ref other_body) =>
+                    name == other_name && body == other_body,
+                &BuiltIn(_, _, _) => false
+            },
+            &BuiltIn(ref name, _, ref body_fn) => match other {
+                &BuiltIn(ref other_name, _, ref other_body_fn) =>
+                    *body_fn as *u8 == *other_body_fn as *u8 && name == other_name,
+                &UserDefined(_, _, _) => false
+            }
+        }
+    }
+}
+impl Show for LambdaVal {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        // The `f.buf` value is of the type `&mut io::Writer`, which is what the
+        // write! macro is expecting. Note that this formatting ignores the
+        // various flags provided to format strings.
+        write!(f.buf, "{}", self.print())
+    }
 }
 
 fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
@@ -134,9 +178,38 @@ fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                         _ => fail!("eval: define: expected list in cdr position")
                     }
                 },
+                Atom(ref val) if *val == Symbol(~"lambda") => {
+                    (eval_lambda(~"anonymous", cdr), env)
+                },
                 _ => fail!("un-implemented case of eval")
             }
         }
+    }
+}
+
+fn eval_lambda(name: ~str, cdr: Expr) -> Option<Expr> {
+    match cdr {
+        List(mut items) => {
+            if items.len() != 2 {
+                fail!("eval: lambda: expected two entries in cdr");
+            }
+            let mut var_names = Vec::new();
+            match *items.shift().expect("eval: lambda: vars should be there") {
+                List(vars) => {
+                    for v in vars.iter() {
+                        match v {
+                            &~Atom(Symbol(ref var_name)) => {
+                                var_names.push(var_name.to_owned());
+                            },
+                            _ => fail!("eval: lambda: var names must be symbols")
+                        }
+                    }
+                }, _ => fail!("eval: lambda: expect vars to be list")
+            }
+            Some(Atom(Lambda(UserDefined(name, var_names, items.shift()
+                                    .expect("eval: lambda: lambda body should be there")))))
+        },
+        _ => fail!("eval: lambda: expected list in cdr position")
     }
 }
 
@@ -304,7 +377,8 @@ impl AtomVal {
         match self {
             &Symbol(ref v) => v.to_owned(),
             &Integer(ref v) => v.to_str(),
-            &Float(ref v) => v.to_str()
+            &Float(ref v) => v.to_str(),
+            &Lambda(ref v) => v.print()
         }
     }
 }
@@ -431,8 +505,8 @@ mod parser_test {
 
 #[cfg(test)]
 mod eval_test {
-    use super::{parse_str, Atom, List, Symbol, Integer, Float,
-                       Env, eval};
+    use super::{parse_str, Atom, List, Lambda, Symbol, Integer, Float,
+                       Env, eval, UserDefined};
     mod un_cons {
         use super::super::{parse_str, Atom, List, Symbol};
         #[should_fail]
@@ -698,6 +772,51 @@ mod eval_test {
     }
 
     #[test]
-    fn foo() {
+    fn lambda_exprs_should_expect_a_list_for_vars_and_an_expr_for_body() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"(lambda (x) 37)");
+        let (out_expr, _) = eval(in_expr, env);
+        match out_expr.unwrap() {
+            Atom(Lambda(body)) => {
+                match body {
+                    UserDefined(_, vars, body) => {
+                        assert_eq!(vars.len(), 1);
+                        assert_eq!(vars.get(0), &~"x");
+                        assert_eq!(*body, Atom(Integer(37)));
+                    }, _ => fail!("expected a UserDefined")
+                }
+            }, _ => fail!("expected atom w/ lambda")
+        }
+    }
+    #[test]
+    fn lambda_exprs_evald_outside_of_define_have_the_name_of_anonymous() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"(lambda (x y) 37)");
+        let (out_expr, _) = eval(in_expr, env);
+        let out_expr = out_expr.unwrap();
+        let out_expr_as_str = out_expr.print();
+        match out_expr {
+            Atom(Lambda(body)) => {
+                match body {
+                    UserDefined(name, _, _) => {
+                        assert_eq!(name, ~"anonymous");
+                    }, _ => fail!("expected a UserDefined")
+                }
+            }, _ => fail!("expected atom w/ lambda")
+        }
+        assert_eq!(out_expr_as_str, ~"lambda(x y):anonymous");
+    }
+    #[test]
+    fn lambda_exprs_evald_within_a_define_have_the_of_the_provided_var_symbol() {
+        fail!("unimpld");
+        // also handle print()
+    }
+    #[test]
+    #[should_fail]
+    fn lambda_expr_eval_should_fail_if_a_list_isnt_in_the_vars_position() {
+    }
+    #[test]
+    #[should_fail]
+    fn lambda_expr_eval_should_fail_if_theres_no_third_position() {
     }
 }
