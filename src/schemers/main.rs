@@ -30,6 +30,7 @@ fn main() {
     println!("{}", parsed_items.print());
 }
 
+// Language data
 pub struct Env {
     entries: HashMap<~str, Expr>,
     outer: Option<~Env>
@@ -52,19 +53,22 @@ pub enum AtomVal {
 #[deriving(Clone)]
 pub enum LambdaVal {
     UserDefined(~str, Vec<~str>, ~Expr),
-    BuiltIn(~str, Vec<~str>, fn(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env))
+    BuiltIn(~str, fn(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env))
 }
+
 impl LambdaVal {
     pub fn print(&self) -> ~str {
-        match *self {
-            UserDefined(ref name, ref vars, _) => {
+        match self {
+            &UserDefined(ref name, ref vars, _) => {
                 let var_expr = List(vars.iter().map(|v| ~Atom(Symbol(v.to_owned()))).collect());
                 format!("lambda:{}{}", name.to_owned(), var_expr.print())
             },
-            BuiltIn(_, _, _) => fail!("LambdaVal.print() unimpl'd for BuiltIn")
+            &BuiltIn(ref name, _) => 
+                format!("builtin-fn:{}", name.to_owned())
         }
     }
 }
+
 impl Eq for LambdaVal {
     // Our custom eq allows numbers which are near each other to be equal! :D
     fn eq(&self, other: &LambdaVal) -> bool {
@@ -72,16 +76,17 @@ impl Eq for LambdaVal {
             &UserDefined(ref name, _, ref body) => match other {
                 &UserDefined(ref other_name, _, ref other_body) =>
                     name == other_name && body == other_body,
-                &BuiltIn(_, _, _) => false
+                &BuiltIn(_, _) => false
             },
-            &BuiltIn(ref name, _, ref body_fn) => match other {
-                &BuiltIn(ref other_name, _, ref other_body_fn) =>
+            &BuiltIn(ref name, ref body_fn) => match other {
+                &BuiltIn(ref other_name, ref other_body_fn) =>
                     *body_fn as *u8 == *other_body_fn as *u8 && name == other_name,
                 &UserDefined(_, _, _) => false
             }
         }
     }
 }
+
 impl Show for LambdaVal {
     fn fmt(&self, f: &mut Formatter) -> Result {
         // The `f.buf` value is of the type `&mut io::Writer`, which is what the
@@ -91,6 +96,7 @@ impl Show for LambdaVal {
     }
 }
 
+// eval'ing Expr->Expr impl
 fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
     match expr {
         // Atom values and values in the Env
@@ -171,17 +177,24 @@ fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                     match target_proc {
                         Atom(Lambda(UserDefined(_, vars, body))) => {
                             match cdr {
-                                List(args) => {
-                                    let args = args.move_iter().map(|x| *x).collect();
-                                    let new_env = Env::new(Some(vars), Some(args), Some(env));
+                                args @ List(_) => {
+                                    let (args, env) = args.unbox_and_eval(env);
+                                    let new_env = Env::new(Some(vars),
+                                                           Some(args), Some(env));
                                     let (out_expr, new_env) = eval(*body, new_env);
                                     (out_expr, new_env.unwrap_parent())
                                 },
                                 _ => fail!("eval: proc invoke: should've gotten a list in the cdr")
                             }
                         },
-                        Atom(Lambda(BuiltIn(_, _vars, _body_fn))) => {
-                            fail!("BuiltIn un-implemented");
+                        Atom(Lambda(BuiltIn(_, _body_fn))) => {
+                            match cdr {
+                                list @ List(_) => {
+                                    let (args, env) = list.unbox_and_eval(env);
+                                    _body_fn(args, env)
+                                },
+                                _ => fail!("expected cdr to be List(...)")
+                            }
                         }, _ => fail!("defined var {} is not a procedure!", proc_name)
                     }
                 }, _ => fail!("car of list isn't a symbol for invocation lookup")
@@ -266,6 +279,50 @@ fn eval_begin(cdr: Expr, env: Env) -> (Option<Expr>, Env) {
     }
 }
 
+// standard procedures impl
+fn add_globals(mut env: Env) -> Env {
+    env.define(~"+", Atom(Lambda(BuiltIn(~"+", add))));
+    env
+}
+
+fn add(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    // run through all the args to see if there're any
+    // floats.. we'll return a float if so.. otherwise
+    // we return an int
+    let mut hasFloats = false;
+    for atom in args.iter() {
+        match atom {
+            &Atom(Float(_)) => hasFloats = true,
+            &Atom(Integer(_)) => {},
+            val => fail!("add: invoking with non numeric input: '{}'", val.print())
+        }
+    }
+    let out_val = if hasFloats {
+        let mut out_val = 0.0;
+        for atom in args.iter() {
+            match atom {
+                &Atom(Float(val)) => out_val += val,
+                &Atom(Integer(val)) =>
+                    out_val += FromStr::from_str(val.to_str()+".0")
+                    .expect("add/sum: should be well-formed float str"),
+                _ => fail!("add/sum: invoking with non numeric input")
+            }
+        }
+        Atom(Float(out_val))
+    } else {
+        let mut out_val = 0;
+        for atom in args.iter() {
+            match atom {
+                &Atom(Integer(val)) => out_val += val,
+                _ => fail!("add/sum: invoking with non numeric input")
+            }
+        }
+        Atom(Integer(out_val))
+    };
+    (Some(out_val), env)
+}
+
+// parser impl
 fn parse_str(input: ~str) -> Expr {
     parse(&mut tokenize(input))
 }
@@ -311,8 +368,10 @@ impl Env {
             let args = args.expect("args should be a value");
             if params.len() == args.len() {
                 for ctr in range(0,params.len()) {
-                    entries.insert(params.get(ctr).to_owned(),
-                                   args.get(ctr).clone());
+                    let var_name = params.get(ctr).to_owned();
+                    let arg = args.get(ctr).clone();
+                    println!("env::new {}={}", var_name, arg.print());
+                    entries.insert(var_name, arg);
                 }
             } else {
                 fail!("params and args length doesn't match")
@@ -425,6 +484,27 @@ impl Expr {
         match *self {
             List(ref items) => items.len() == 0,
             _ => false
+        }
+    }
+    
+    pub fn unbox_and_eval(self, env: Env) -> (Vec<Expr>, Env) {
+        match self {
+            List(items) => {
+                let args: Vec<Expr> = items.move_iter().map(|x| *x).collect();
+                let mut env = env;
+                let mut evald_args = Vec::new();
+                for i in args.move_iter() {
+                    let (evald_arg, out_env) = eval(i, env);
+                    let evald_arg =
+                        evald_arg
+                        .expect("eval'd arg should ret expr");
+                    println!("lambda arg: {}",evald_arg.print());
+                    env = out_env;
+                    evald_args.push(evald_arg);
+                }
+                (evald_args, env)
+            },
+            _ => fail!("calling unbox on non-List expr")
         }
     }
 }
@@ -575,7 +655,7 @@ mod parser_test {
 
 #[cfg(test)]
 mod eval_test {
-    use super::{parse_str, Atom, List, Lambda, Symbol, Integer, Float,
+    use super::{add_globals, parse_str, Atom, List, Lambda, Symbol, Integer, Float,
                        Env, eval, UserDefined};
     mod un_cons {
         use super::super::{parse_str, Atom, List, Symbol};
@@ -956,5 +1036,33 @@ mod eval_test {
         let in_expr = parse_str(~"(get-1)");
         let (out_expr, _) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Integer(1)));
+    }
+
+    #[test]
+    fn can_define_a_lambda_that_takes_an_arg_and_invoke_it() {
+        let env = add_globals(Env::new(None, None, None));
+        let in_expr = parse_str(
+            ~"(begin (define double (lambda (x) (+ x x))) (double 3))");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Integer(6)));
+    }
+}
+
+#[cfg(test)]
+mod std_procedures_test {
+    use super::{parse_str, add_globals, eval, Env, Atom, Integer};
+    #[test]
+    fn two_plus_two_equals_four() {
+        let env = add_globals(Env::new(None, None, None));
+        let in_expr = parse_str(~"(+ 2 2)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Integer(4)));
+    }
+    #[test]
+    fn builtin_print_sanity_check() {
+        let env = add_globals(Env::new(None, None, None));
+        let in_expr = parse_str(~"+");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap().print(), ~"builtin-fn:+");
     }
 }
