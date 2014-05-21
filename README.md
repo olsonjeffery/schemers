@@ -12,7 +12,7 @@ In no particular order:
 * Add the test cases that appear near the env of [the first essay][Norvig1]
 * Work on the actual API:
   * It is quite hideous right now, with `fail!`s all over the place
-  * Should replace with `Resut`-based API (would definitely ease error-reporting centralization, as well as improving overall grossness)
+  * Should replace with `Result`-based API (would definitely ease error-reporting centralization, as well as improving overall grossness)
 * Port to a newer version of Rust (waiting for `~str` removal to land)
 * Refactor code layout:
   * It's all one big file with impl plus tests (closing in on a 1,000 line, ewww)
