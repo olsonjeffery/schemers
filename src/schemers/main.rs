@@ -165,7 +165,26 @@ fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                 Atom(ref val) if *val == Symbol(~"begin") => {
                     eval_begin(cdr, env)
                 },
-                _ => fail!("un-implemented case of eval")
+                // oh boy a procedure call!
+                Atom(Symbol(proc_name)) => {
+                    let target_proc = env.find(&proc_name);
+                    match target_proc {
+                        Atom(Lambda(UserDefined(_, vars, body))) => {
+                            match cdr {
+                                List(args) => {
+                                    let args = args.move_iter().map(|x| *x).collect();
+                                    let new_env = Env::new(Some(vars), Some(args), Some(env));
+                                    let (out_expr, new_env) = eval(*body, new_env);
+                                    (out_expr, new_env.unwrap_parent())
+                                },
+                                _ => fail!("eval: proc invoke: should've gotten a list in the cdr")
+                            }
+                        },
+                        Atom(Lambda(BuiltIn(_, _vars, _body_fn))) => {
+                            fail!("BuiltIn un-implemented");
+                        }, _ => fail!("defined var {} is not a procedure!", proc_name)
+                    }
+                }, _ => fail!("car of list isn't a symbol for invocation lookup")
             }
         }
     }
@@ -927,5 +946,15 @@ mod eval_test {
         let in_expr = parse_str(~"(begin (define set! 42) (set! set! 37) set!)");
         let (out_expr, _) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Integer(37)));
+    }
+
+    #[test]
+    fn can_define_a_lambda_that_returns_an_atom_and_subsequently_invoke_it() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"(define get-1 (lambda () 1))");
+        let (_, env) = eval(in_expr, env);
+        let in_expr = parse_str(~"(get-1)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Integer(1)));
     }
 }
