@@ -1046,6 +1046,14 @@ mod eval_test {
         let (out_expr, _) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Integer(6)));
     }
+
+    #[test]
+    fn builtin_print_sanity_check() {
+        let env = add_globals(Env::new(None, None, None));
+        let in_expr = parse_str(~"+");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap().print(), ~"builtin-fn:+");
+    }
 }
 
 #[cfg(test)]
@@ -1057,12 +1065,5 @@ mod std_procedures_test {
         let in_expr = parse_str(~"(+ 2 2)");
         let (out_expr, _) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Integer(4)));
-    }
-    #[test]
-    fn builtin_print_sanity_check() {
-        let env = add_globals(Env::new(None, None, None));
-        let in_expr = parse_str(~"+");
-        let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap().print(), ~"builtin-fn:+");
     }
 }
