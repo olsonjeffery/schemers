@@ -162,6 +162,9 @@ fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                 Atom(ref val) if *val == Symbol(~"lambda") => {
                     (eval_lambda(~"anonymous", cdr), env)
                 },
+                Atom(ref val) if *val == Symbol(~"begin") => {
+                    eval_begin(cdr, env)
+                },
                 _ => fail!("un-implemented case of eval")
             }
         }
@@ -229,6 +232,21 @@ fn eval_lambda(name: ~str, cdr: Expr) -> Option<Expr> {
     }
 }
 
+fn eval_begin(cdr: Expr, env: Env) -> (Option<Expr>, Env) {
+    match cdr {
+        List(items) => {
+            let (mut out_expr, mut env) = (None, env);
+            for e in items.move_iter() {
+                let (res_expr, res_env) = eval(*e, env);
+                out_expr = res_expr;
+                env = res_env;
+            }
+            (out_expr, env)
+        },
+        _ => fail!("eval: begin: expcted a list for the input cdr")
+    }
+}
+
 fn parse_str(input: ~str) -> Expr {
     parse(&mut tokenize(input))
 }
@@ -237,8 +255,12 @@ fn pad_input(input: ~str) -> ~str {
     input.replace("(", " ( ").replace(")", " ) ")
 }
 
+fn strip_commas(input: ~str) -> ~str {
+    input.replace(",", " ").replace("  ", " ")
+}
+
 fn tokenize(input: ~str) -> Vec<~str> {
-    pad_input(input).split_str(" ")
+    strip_commas(pad_input(input)).split_str(" ")
         .filter(|i| *i != "").map(|i| i.to_owned()).collect()
 }
 
@@ -401,7 +423,7 @@ impl AtomVal {
 
 #[cfg(test)]
 mod parser_test {
-    use super::{pad_input, tokenize, parse, Atom, List, Symbol, Integer, Float};
+    use super::{pad_input, tokenize, parse, Atom, List, Symbol, Integer, Float, parse_str};
 
     #[test]
     fn pad_input_should_insert_spaces_before_and_after_parens() {
@@ -516,6 +538,19 @@ mod parser_test {
         let parsed_item = parse(tokens);
         let output = parsed_item.print();
         assert_eq!(input, output);
+    }
+    #[test]
+    fn commas_should_be_treated_as_whitespace() {
+        let expr = parse_str(~"(x, y,z)");
+        match &expr {
+            &List(ref items) => {
+                assert_eq!(items.len(), 3);
+                assert_eq!(items.get(0), &~Atom(Symbol(~"x")));
+                assert_eq!(items.get(1), &~Atom(Symbol(~"y")));
+                assert_eq!(items.get(2), &~Atom(Symbol(~"z")));
+            }, _ => fail!("expected a list")
+        }
+        assert_eq!(expr.print(), ~"(x y z)")
     }
 }
 
@@ -853,5 +888,44 @@ mod eval_test {
         let env = Env::new(None, None, None);
         let in_expr = parse_str(~"(define foo (lambda (x)))");
         eval(in_expr, env);
+    }
+
+    #[test]
+    fn begin_should_return_the_evald_atom_expr_of_the_tail_param() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"(begin (define x 37) 42)");
+        let (out_expr, env) = eval(in_expr, env);
+        assert_eq!(env.find(&~"x"), Atom(Integer(37)));
+        assert_eq!(out_expr.unwrap(), Atom(Integer(42)));
+    }
+    #[test]
+    fn begin_should_return_no_expr_if_its_tail_param_returns_nothing() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"(begin (define x 37))");
+        let (out_expr, env) = eval(in_expr, env);
+        assert_eq!(env.find(&~"x"), Atom(Integer(37)));
+        assert_eq!(out_expr, None);
+    }
+    #[test]
+    fn begin_can_have_a_list_in_the_tail_position() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"(begin (define x 37) (quote (1 x 3.4)))");
+        let (out_expr, env) = eval(in_expr, env);
+        assert_eq!(env.find(&~"x"), Atom(Integer(37)));
+        match out_expr.unwrap() {
+            List(items) => {
+                assert_eq!(items.len(), 3);
+                assert_eq!(*items.get(0), ~Atom(Integer(1)));
+                assert_eq!(*items.get(1), ~Atom(Symbol(~"x")));
+                assert_eq!(*items.get(2), ~Atom(Float(3.4)));
+            }, _ => fail!("expected a list")
+        }
+    }
+    #[test]
+    fn can_define_a_var_with_the_same_name_as_a_special_form_keyword_but_SF_is_still_usable() {
+        let env = Env::new(None, None, None);
+        let in_expr = parse_str(~"(begin (define set! 42) (set! set! 37) set!)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Integer(37)));
     }
 }
