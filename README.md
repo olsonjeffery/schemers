@@ -4,12 +4,13 @@ This repository houses a self-contained implementation of Peter Norvig's [first 
 
 The codebase is well tested, with many examples demonstrating the use of all of the constructs contained herein.
 
-### TODO List
+## TODO List
 
 In no particular order:
 
-* Implement the contents of `add_globals`
-* Add the test cases that appear near the env of [the first essay][Norvig1]
+#### Cleanup/completeness
+
+* Implement the contents of `add_globals`, test cases that appear near the end of [the first essay][Norvig1]
 * Work on the actual API:
   * It is quite hideous right now, with `fail!`s all over the place
   * Should replace with `Result`-based API (would definitely ease error-reporting centralization, as well as improving overall grossness)
@@ -17,6 +18,9 @@ In no particular order:
 * Refactor code layout:
   * It's all one big file with impl plus tests (closing in on a 1,000 line, ewww)
   * Probably drop tests into their own module so a LOC grep can just hit the impl modules
+
+#### Feature Work
+
 * Tackle the contents Peter Norvig's [second essay on the same topic][Norvig2], notably:
   * more `Atom` types (strings, bools, complex numbers, etc)
   * Macros
