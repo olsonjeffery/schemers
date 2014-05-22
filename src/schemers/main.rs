@@ -13,6 +13,7 @@ extern crate collections = "collections";
 use std::from_str::FromStr;
 use std::fmt::{Show, Formatter, Result};
 use collections::hashmap::HashMap;
+use std::num::{from_f64, from_i64};
 
 // this is starting out as a straight port of Peter Norvig's
 // lis.py (the first iteration) to Rust
@@ -281,11 +282,11 @@ fn eval_begin(cdr: Expr, env: Env) -> (Option<Expr>, Env) {
 
 // standard procedures impl
 fn add_globals(mut env: Env) -> Env {
-    env.define(~"+", Atom(Lambda(BuiltIn(~"+", add))));
+    env.define(~"+", Atom(Lambda(BuiltIn(~"+", builtin_add))));
+    env.define(~"-", Atom(Lambda(BuiltIn(~"-", builtin_subtract))));
     env
 }
-
-fn add(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+fn builtin_add(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     // run through all the args to see if there're any
     // floats.. we'll return a float if so.. otherwise
     // we return an int
@@ -299,21 +300,62 @@ fn add(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     }
     let out_val = if hasFloats {
         let mut out_val = 0.0;
-        for atom in args.iter() {
+        for atom in args.move_iter() {
             match atom {
-                &Atom(Float(val)) => out_val += val,
-                &Atom(Integer(val)) =>
-                    out_val += FromStr::from_str(val.to_str()+".0")
-                    .expect("add/sum: should be well-formed float str"),
+                Atom(Float(val)) => out_val += val,
+                v @ Atom(Integer(_)) =>
+                    out_val += v.unwrap_float(),
                 _ => fail!("add/sum: invoking with non numeric input")
             }
         }
         Atom(Float(out_val))
     } else {
         let mut out_val = 0;
-        for atom in args.iter() {
+        for atom in args.move_iter() {
             match atom {
-                &Atom(Integer(val)) => out_val += val,
+                Atom(Integer(val)) => out_val += val,
+                _ => fail!("add/sum: invoking with non numeric input")
+            }
+        }
+        Atom(Integer(out_val))
+    };
+    (Some(out_val), env)
+}
+
+fn builtin_subtract(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    let mut hasFloats = false;
+    for atom in args.iter() {
+        match atom {
+            &Atom(Float(_)) => hasFloats = true,
+            &Atom(Integer(_)) => {},
+            val => fail!("add: invoking with non numeric input: '{}'", val.print())
+        }
+    }
+    let out_val = if hasFloats {
+        let mut out_val = match args.shift()
+            .expect("head of subtract args should be Some()") {
+                v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.unwrap_float(),
+                _ => fail!("subtract: cannot process non-numeric input")
+        };
+        for atom in args.move_iter() {
+            println!("non-first arg: {} out_val: {}", atom.print(), out_val);
+            match atom {
+                v @ Atom(Integer(_)) | v @ Atom(Float(_)) =>
+                    out_val -= v.unwrap_float(),
+                _ => fail!("add/sum: invoking with non numeric input")
+            }
+        }
+        Atom(Float(out_val))
+    } else {
+        let mut out_val = match args.shift()
+            .expect("head of subtract args should be Some()") {
+                v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.unwrap_integer(),
+                _ => fail!("subtract: cannot process non-numeric input")
+        };
+        for atom in args.iter() {
+            println!("non-first arg: {} out_val: {}", atom.print(), out_val);
+            match atom {
+                &Atom(Integer(val)) => out_val -= val,
                 _ => fail!("add/sum: invoking with non numeric input")
             }
         }
@@ -487,6 +529,8 @@ impl Expr {
         }
     }
     
+    // fns for consuming/breaking down Exprs into composed elements
+    // or underlying values
     pub fn unbox_and_eval(self, env: Env) -> (Vec<Expr>, Env) {
         match self {
             List(items) => {
@@ -505,6 +549,20 @@ impl Expr {
                 (evald_args, env)
             },
             _ => fail!("calling unbox on non-List expr")
+        }
+    }
+    pub fn unwrap_float(self) -> f64 {
+        match self {
+            Atom(Integer(v)) => from_i64(v).unwrap(),
+            Atom(Float(v)) => v,
+            _ => fail!("calling unwrap_float() on non-numeric value")
+        }
+    }
+    pub fn unwrap_integer(self) -> i64 {
+        match self {
+            Atom(Float(v)) => from_f64(v).unwrap(),
+            Atom(Integer(v)) => v,
+            _ => fail!("calling unwrap_integer() on non-numeric value")
         }
     }
 }
@@ -1057,13 +1115,48 @@ mod eval_test {
 }
 
 #[cfg(test)]
-mod std_procedures_test {
-    use super::{parse_str, add_globals, eval, Env, Atom, Integer};
+mod builtin_procedures_test {
+    use super::{parse_str, add_globals, eval, Env, Atom, Integer, Float};
     #[test]
     fn two_plus_two_equals_four() {
         let env = add_globals(Env::new(None, None, None));
         let in_expr = parse_str(~"(+ 2 2)");
         let (out_expr, _) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Integer(4)));
+    }
+    #[test]
+    fn can_sum_an_arbitrary_number_of_items() {
+        let env = add_globals(Env::new(None, None, None));
+        let in_expr = parse_str(~"(+ 2 2 1 1 1 1 4)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Integer(12)));
+    }
+    #[test]
+    fn two_point_five_plus_two_equals_four_point_five() {
+        let env = add_globals(Env::new(None, None, None));
+        let in_expr = parse_str(~"(+ 2.5 2)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Float(4.5)));
+    }
+    #[test]
+    fn four_minus_three_equals_one() {
+        let env = add_globals(Env::new(None, None, None));
+        let in_expr = parse_str(~"(- 4 3)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Integer(1)));
+    }
+    #[test]
+    fn four_point_five_minus_one_equals_equals_three_point_five() {
+        let env = add_globals(Env::new(None, None, None));
+        let in_expr = parse_str(~"(- 4.5 1)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Float(3.5)));
+    }
+    #[test]
+    fn can_subtract_an_arbitrary_number_of_items() {
+        let env = add_globals(Env::new(None, None, None));
+        let in_expr = parse_str(~"(- 4.5 1 3)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Float(0.5)));
     }
 }

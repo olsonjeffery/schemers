@@ -19,6 +19,7 @@ In no particular order:
 * Refactor code layout:
   * It's all one big file with impl plus tests (closing in on a 1,000 line, ewww)
   * Probably drop tests into their own module so a LOC grep can just hit the impl modules
+  * __API Documentation__
 
 #### Feature Work
 
