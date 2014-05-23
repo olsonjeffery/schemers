@@ -68,7 +68,7 @@ impl LambdaVal {
                 let var_expr = List(vars.iter().map(|v| ~Atom(Symbol(v.to_owned()))).collect());
                 format!("lambda:{}{}", name.to_owned(), var_expr.print())
             },
-            &BuiltIn(ref name, _) => 
+            &BuiltIn(ref name, _) =>
                 format!("builtin-fn:{}", name.to_owned())
         }
     }
@@ -285,15 +285,16 @@ fn eval_begin(cdr: Expr, env: Env) -> (Option<Expr>, Env) {
 }
 
 // standard procedures impl
-fn add_globals(mut env: Env) -> Env {
+fn add_builtins(mut env: Env) -> Env {
     env.define(~"+", Atom(Lambda(BuiltIn(~"+", builtin_add))));
     env.define(~"-", Atom(Lambda(BuiltIn(~"-", builtin_subtract))));
+    env.define(~"*", Atom(Lambda(BuiltIn(~"*", builtin_multiply))));
+    env.define(~"/", Atom(Lambda(BuiltIn(~"/", builtin_divide))));
+    env.define(~"<", Atom(Lambda(BuiltIn(~"<", builtin_lt))));
+    env.define(~">", Atom(Lambda(BuiltIn(~">", builtin_gt))));
     env
 }
-fn builtin_add(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
-    // run through all the args to see if there're any
-    // floats.. we'll return a float if so.. otherwise
-    // we return an int
+fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     let mut hasFloats = false;
     for atom in args.iter() {
         match atom {
@@ -303,22 +304,29 @@ fn builtin_add(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
         }
     }
     let out_val = if hasFloats {
-        let mut out_val = 0.0;
+        let mut out_val = match args.shift()
+            .expect("head of add args should be Some()") {
+                v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.unwrap_float(),
+                _ => fail!("add: cannot process non-numeric input")
+        };
         for atom in args.move_iter() {
             match atom {
-                Atom(Float(val)) => out_val += val,
-                v @ Atom(Integer(_)) =>
+                v @ Atom(Integer(_)) | v @ Atom(Float(_)) =>
                     out_val += v.unwrap_float(),
-                _ => fail!("add/sum: invoking with non numeric input")
+                _ => fail!("add: invoking with non numeric input")
             }
         }
         Atom(Float(out_val))
     } else {
-        let mut out_val = 0;
-        for atom in args.move_iter() {
+        let mut out_val = match args.shift()
+            .expect("head of add args should be Some()") {
+                v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.unwrap_integer(),
+                _ => fail!("add: cannot process non-numeric input")
+        };
+        for atom in args.iter() {
             match atom {
-                Atom(Integer(val)) => out_val += val,
-                _ => fail!("add/sum: invoking with non numeric input")
+                &Atom(Integer(val)) => out_val += val,
+                _ => fail!("add: invoking with non numeric input")
             }
         }
         Atom(Integer(out_val))
@@ -332,7 +340,7 @@ fn builtin_subtract(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
         match atom {
             &Atom(Float(_)) => hasFloats = true,
             &Atom(Integer(_)) => {},
-            val => fail!("add: invoking with non numeric input: '{}'", val.print())
+            val => fail!("subtract: invoking with non numeric input: '{}'", val.print())
         }
     }
     let out_val = if hasFloats {
@@ -342,11 +350,10 @@ fn builtin_subtract(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
                 _ => fail!("subtract: cannot process non-numeric input")
         };
         for atom in args.move_iter() {
-            println!("non-first arg: {} out_val: {}", atom.print(), out_val);
             match atom {
                 v @ Atom(Integer(_)) | v @ Atom(Float(_)) =>
                     out_val -= v.unwrap_float(),
-                _ => fail!("add/sum: invoking with non numeric input")
+                _ => fail!("subtract: invoking with non numeric input")
             }
         }
         Atom(Float(out_val))
@@ -357,13 +364,192 @@ fn builtin_subtract(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
                 _ => fail!("subtract: cannot process non-numeric input")
         };
         for atom in args.iter() {
-            println!("non-first arg: {} out_val: {}", atom.print(), out_val);
             match atom {
                 &Atom(Integer(val)) => out_val -= val,
-                _ => fail!("add/sum: invoking with non numeric input")
+                _ => fail!("subtract: invoking with non numeric input")
             }
         }
         Atom(Integer(out_val))
+    };
+    (Some(out_val), env)
+}
+
+fn builtin_multiply(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    let mut hasFloats = false;
+    for atom in args.iter() {
+        match atom {
+            &Atom(Float(_)) => hasFloats = true,
+            &Atom(Integer(_)) => {},
+            val => fail!("multiply: invoking with non numeric input: '{}'", val.print())
+        }
+    }
+    let out_val = if hasFloats {
+        let mut out_val = match args.shift()
+            .expect("head of multiply args should be Some()") {
+                v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.unwrap_float(),
+                _ => fail!("multiply: cannot process non-numeric input")
+        };
+        for atom in args.move_iter() {
+            match atom {
+                v @ Atom(Integer(_)) | v @ Atom(Float(_)) =>
+                    out_val *= v.unwrap_float(),
+                _ => fail!("multiply: invoking with non numeric input")
+            }
+        }
+        Atom(Float(out_val))
+    } else {
+        let mut out_val = match args.shift()
+            .expect("head of multiply args should be Some()") {
+                v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.unwrap_integer(),
+                _ => fail!("multiply: cannot process non-numeric input")
+        };
+        for atom in args.iter() {
+            match atom {
+                &Atom(Integer(val)) => out_val *= val,
+                _ => fail!("multiply: invoking with non numeric input")
+            }
+        }
+        Atom(Integer(out_val))
+    };
+    (Some(out_val), env)
+}
+
+fn builtin_divide(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    let mut hasFloats = false;
+    for atom in args.iter() {
+        match atom {
+            &Atom(Float(_)) => hasFloats = true,
+            &Atom(Integer(_)) => {},
+            val => fail!("divide: invoking with non numeric input: '{}'", val.print())
+        }
+    }
+    let out_val = if hasFloats {
+        let mut out_val = match args.shift()
+            .expect("head of divide args should be Some()") {
+                v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.unwrap_float(),
+                _ => fail!("divide: cannot process non-numeric input")
+        };
+        for atom in args.move_iter() {
+            match atom {
+                v @ Atom(Integer(_)) | v @ Atom(Float(_)) =>
+                    out_val /= v.unwrap_float(),
+                _ => fail!("divide: invoking with non numeric input")
+            }
+        }
+        Atom(Float(out_val))
+    } else {
+        let mut out_val = match args.shift()
+            .expect("head of divide args should be Some()") {
+                v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.unwrap_integer(),
+                _ => fail!("divide: cannot process non-numeric input")
+        };
+        for atom in args.iter() {
+            match atom {
+                &Atom(Integer(val)) => out_val /= val,
+                _ => fail!("divide: invoking with non numeric input")
+            }
+        }
+        Atom(Integer(out_val))
+    };
+    (Some(out_val), env)
+}
+
+fn builtin_lt(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    let mut hasFloats = false;
+    for atom in args.iter() {
+        match atom {
+            &Atom(Float(_)) => hasFloats = true,
+            &Atom(Integer(_)) => {},
+            val => fail!("less-than: invoking with non numeric input: '{}'", val.print())
+        }
+    }
+    let out_val = if hasFloats {
+        let mut state = false;
+        let mut left = match args.shift()
+            .expect("head of less-than args should be Some()") {
+                left @ Atom(Integer(_)) |
+                left @ Atom(Float(_)) => left.unwrap_float(),
+                _ => fail!("less-than: cannot process non-numeric input")
+        };
+        for atom in args.move_iter() {
+            match atom {
+                right @ Atom(Integer(_)) | right @ Atom(Float(_)) => {
+                    let right = right.unwrap_float();
+                    state = left < right;
+                    left = right;
+                },
+                _ => fail!("less-than: invoking with non numeric input")
+            }
+        }
+        Atom(Boolean(state))
+    } else {
+        let mut state = false;
+        let mut left = match args.shift()
+            .expect("head of less-than args should be Some()") {
+                left @ Atom(Integer(_))
+                    | left @ Atom(Float(_)) => left.unwrap_integer(),
+                _ => fail!("less-than: cannot process non-numeric input")
+        };
+        for atom in args.move_iter() {
+            match atom {
+                Atom(Integer(right)) => {
+                    state = left < right;
+                    left = right;
+                }
+                _ => fail!("less-than: invoking with non numeric input")
+            }
+        }
+        Atom(Boolean(state))
+    };
+    (Some(out_val), env)
+}
+
+fn builtin_gt(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    let mut hasFloats = false;
+    for atom in args.iter() {
+        match atom {
+            &Atom(Float(_)) => hasFloats = true,
+            &Atom(Integer(_)) => {},
+            val => fail!("greater-than: invoking with non numeric input: '{}'", val.print())
+        }
+    }
+    let out_val = if hasFloats {
+        let mut state = false;
+        let mut left = match args.shift()
+            .expect("head of greater-than args should be Some()") {
+                left @ Atom(Integer(_)) |
+                left @ Atom(Float(_)) => left.unwrap_float(),
+                _ => fail!("greater-than: cannot process non-numeric input")
+        };
+        for atom in args.move_iter() {
+            match atom {
+                right @ Atom(Integer(_)) | right @ Atom(Float(_)) => {
+                    let right = right.unwrap_float();
+                    state = left > right;
+                    left = right;
+                },
+                _ => fail!("greater-than: invoking with non numeric input")
+            }
+        }
+        Atom(Boolean(state))
+    } else {
+        let mut state = false;
+        let mut left = match args.shift()
+            .expect("head of greater-than args should be Some()") {
+                left @ Atom(Integer(_))
+                    | left @ Atom(Float(_)) => left.unwrap_integer(),
+                _ => fail!("greater-than: cannot process non-numeric input")
+        };
+        for atom in args.move_iter() {
+            match atom {
+                Atom(Integer(right)) => {
+                    state = left > right;
+                    left = right;
+                }
+                _ => fail!("greater-than: invoking with non numeric input")
+            }
+        }
+        Atom(Boolean(state))
     };
     (Some(out_val), env)
 }
@@ -416,7 +602,6 @@ impl Env {
                 for ctr in range(0,params.len()) {
                     let var_name = params.get(ctr).to_owned();
                     let arg = args.get(ctr).clone();
-                    println!("env::new {}={}", var_name, arg.print());
                     entries.insert(var_name, arg);
                 }
             } else {
@@ -542,7 +727,7 @@ impl Expr {
             _ => false
         }
     }
-    
+
     // fns for consuming/breaking down Exprs into composed elements
     // or underlying values
     pub fn unbox_and_eval(self, env: Env) -> (Vec<Expr>, Env) {
@@ -556,7 +741,6 @@ impl Expr {
                     let evald_arg =
                         evald_arg
                         .expect("eval'd arg should ret expr");
-                    println!("lambda arg: {}",evald_arg.print());
                     env = out_env;
                     evald_args.push(evald_arg);
                 }
@@ -1124,7 +1308,7 @@ mod eval_tests {
 
     #[test]
     fn can_define_a_lambda_that_takes_an_arg_and_invoke_it() {
-        let env = add_globals(Env::new(None, None, None));
+        let env = add_builtins(Env::new(None, None, None));
         let in_expr = parse_str(
             ~"(begin (define double (lambda (x) (+ x x))) (double 3))");
         let (out_expr, _) = eval(in_expr, env);
@@ -1133,7 +1317,7 @@ mod eval_tests {
 
     #[test]
     fn builtin_print_sanity_check() {
-        let env = add_globals(Env::new(None, None, None));
+        let env = add_builtins(Env::new(None, None, None));
         let in_expr = parse_str(~"+");
         let (out_expr, _) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap().print(), ~"builtin-fn:+");
@@ -1141,48 +1325,147 @@ mod eval_tests {
 }
 
 #[cfg(test)]
-mod builtin_procedures_test {
-    use super::{parse_str, add_globals, eval, Env, Atom, Integer, Float};
+mod builtins_tests {
+    use super::{parse_str, add_builtins, eval, Env, Atom, Integer, Float,
+        Boolean};
     #[test]
     fn two_plus_two_equals_four() {
-        let env = add_globals(Env::new(None, None, None));
+        let env = add_builtins(Env::new(None, None, None));
         let in_expr = parse_str(~"(+ 2 2)");
         let (out_expr, _) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Integer(4)));
     }
     #[test]
     fn can_sum_an_arbitrary_number_of_items() {
-        let env = add_globals(Env::new(None, None, None));
+        let env = add_builtins(Env::new(None, None, None));
         let in_expr = parse_str(~"(+ 2 2 1 1 1 1 4)");
         let (out_expr, _) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Integer(12)));
     }
     #[test]
     fn two_point_five_plus_two_equals_four_point_five() {
-        let env = add_globals(Env::new(None, None, None));
+        let env = add_builtins(Env::new(None, None, None));
         let in_expr = parse_str(~"(+ 2.5 2)");
         let (out_expr, _) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Float(4.5)));
     }
     #[test]
     fn four_minus_three_equals_one() {
-        let env = add_globals(Env::new(None, None, None));
+        let env = add_builtins(Env::new(None, None, None));
         let in_expr = parse_str(~"(- 4 3)");
         let (out_expr, _) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Integer(1)));
     }
     #[test]
     fn four_point_five_minus_one_equals_equals_three_point_five() {
-        let env = add_globals(Env::new(None, None, None));
+        let env = add_builtins(Env::new(None, None, None));
         let in_expr = parse_str(~"(- 4.5 1)");
         let (out_expr, _) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Float(3.5)));
     }
     #[test]
     fn can_subtract_an_arbitrary_number_of_items() {
-        let env = add_globals(Env::new(None, None, None));
+        let env = add_builtins(Env::new(None, None, None));
         let in_expr = parse_str(~"(- 4.5 1 3)");
         let (out_expr, _) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Float(0.5)));
+    }
+    #[test]
+    fn two_times_twenty_one_equals_42() {
+        let env = add_builtins(Env::new(None, None, None));
+        let in_expr = parse_str(~"(* 2 21)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Integer(42)));
+    }
+    #[test]
+    fn can_multiply_an_aribtrary_number_of_items() {
+        let env = add_builtins(Env::new(None, None, None));
+        let in_expr = parse_str(~"(* 4 5 3)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Integer(60)));
+    }
+    #[test]
+    fn two_times_one_point_five_equals_three() {
+        let env = add_builtins(Env::new(None, None, None));
+        let in_expr = parse_str(~"(* 2 1.5)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Float(3.0)));
+    }
+    #[test]
+    fn ten_divided_by_5_equals_2() {
+        let env = add_builtins(Env::new(None, None, None));
+        let in_expr = parse_str(~"(/ 10 5)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Integer(2)));
+    }
+    #[test]
+    fn five_divided_by_two_point_five_equals_2() {
+        let env = add_builtins(Env::new(None, None, None));
+        let in_expr = parse_str(~"(/ 5 2.5)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Float(2.0)));
+    }
+    #[test]
+    fn can_divide_an_arbitrary_number_of_items() {
+        let env = add_builtins(Env::new(None, None, None));
+        let in_expr = parse_str(~"(/ 100 10 5)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Integer(2)));
+    }
+    #[test]
+    fn two_is_less_than_four() {
+        let env = add_builtins(Env::new(None, None, None));
+        let in_expr = parse_str(~"(< 2 4)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+    }
+    #[test]
+    fn five_is_not_less_than_one() {
+        let env = add_builtins(Env::new(None, None, None));
+        let in_expr = parse_str(~"(< 5 1)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+    }
+    #[test]
+    fn one_point_one_is_less_than_one_point_two() {
+        let env = add_builtins(Env::new(None, None, None));
+        let in_expr = parse_str(~"(< 1.1 1.2)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+    }
+    #[test]
+    fn one_point_one_is_less_than_two() {
+        let env = add_builtins(Env::new(None, None, None));
+        let in_expr = parse_str(~"(< 1.1 2)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+    }
+    #[test]
+    fn four_is_greater_than_two() {
+        let env = add_builtins(Env::new(None, None, None));
+        let in_expr = parse_str(~"(> 4 2)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+    }
+    #[test]
+    fn one_is_not_greater_than_five() {
+        let env = add_builtins(Env::new(None, None, None));
+        let in_expr = parse_str(~"(> 1 5)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+    }
+    #[test]
+    fn one_point_two_is_greater_than_one_point_one() {
+        let env = add_builtins(Env::new(None, None, None));
+        let in_expr = parse_str(~"(> 1.2 1.1)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+    }
+    #[test]
+    fn two_is_greater_than_one_point_one() {
+        let env = add_builtins(Env::new(None, None, None));
+        let in_expr = parse_str(~"(> 2 1.1)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
     }
 }
