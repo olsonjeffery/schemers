@@ -292,6 +292,7 @@ fn add_builtins(mut env: Env) -> Env {
     env.define(~"/", Atom(Lambda(BuiltIn(~"/", builtin_divide))));
     env.define(~"<", Atom(Lambda(BuiltIn(~"<", builtin_lt))));
     env.define(~">", Atom(Lambda(BuiltIn(~">", builtin_gt))));
+    env.define(~"not", Atom(Lambda(BuiltIn(~"not", builtin_not))));
     env
 }
 fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
@@ -552,6 +553,15 @@ fn builtin_gt(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
         Atom(Boolean(state))
     };
     (Some(out_val), env)
+}
+fn builtin_not(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    if args.len() != 1 {
+        fail!("not: expect a single parameter")
+    }
+    match args.pop().unwrap() {
+        Atom(Boolean(false)) => (Some(Atom(Boolean(true))), env),
+        _ => (Some(Atom(Boolean(false))), env),
+    }
 }
 
 // parser impl
@@ -1467,5 +1477,33 @@ mod builtins_tests {
         let in_expr = parse_str(~"(> 2 1.1)");
         let (out_expr, _) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+    }
+    #[test]
+    fn a_call_to_not_with_false_returns_true() {
+        let env = add_builtins(Env::new(None, None, None));
+        let in_expr = parse_str(~"(not #f)");
+        let (out_expr, env) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+        let in_expr = parse_str(~"(not (quote #f))");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+    }
+    #[test]
+    fn a_call_to_not_with_anything_that_isnt_false_returns_false() {
+        let env = add_builtins(Env::new(None, None, None));
+        let (out_expr, env) = eval(parse_str(~"(not #t)"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+        let (out_expr, env) = eval(parse_str(~"(not (quote ()))"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+        let (out_expr, env) = eval(parse_str(~"(not 1)"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+        let (out_expr, env) = eval(parse_str(~"(not 1.3)"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+        let (out_expr, env) = eval(parse_str(~"(not (quote 1))"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+        let (out_expr, env) = eval(parse_str(~"(not (lambda (x) x))"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+        let (out_expr, _) = eval(parse_str(~"(not (+ 1 1))"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
     }
 }
