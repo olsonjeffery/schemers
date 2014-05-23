@@ -78,9 +78,21 @@ impl Eq for LambdaVal {
     // Our custom eq allows numbers which are near each other to be equal! :D
     fn eq(&self, other: &LambdaVal) -> bool {
         match self {
-            &UserDefined(ref name, _, ref body) => match other {
-                &UserDefined(ref other_name, _, ref other_body) =>
-                    name == other_name && body == other_body,
+            &UserDefined(ref name, ref args, ref body) => match other {
+                &UserDefined(ref other_name, ref other_args, ref other_body) =>
+                    name == other_name &&
+                    {
+                        if args.len() != other_args.len() {
+                            return false;
+                        }
+                        let mut args_match = true;
+                        for ctr in range(0, args.len()) {
+                            args_match = args.get(ctr)
+                                == other_args.get(ctr);
+                        }
+                        args_match
+                    } &&
+                    body == other_body,
                 &BuiltIn(_, _) => false
             },
             &BuiltIn(ref name, ref body_fn) => match other {
@@ -295,6 +307,7 @@ fn add_builtins(mut env: Env) -> Env {
     env.define(~"<=", Atom(Lambda(BuiltIn(~"<=", builtin_lte))));
     env.define(~">=", Atom(Lambda(BuiltIn(~">=", builtin_gte))));
     env.define(~"not", Atom(Lambda(BuiltIn(~"not", builtin_not))));
+    env.define(~"=", Atom(Lambda(BuiltIn(~"=", builtin_eq))));
     env
 }
 fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
@@ -676,6 +689,18 @@ fn builtin_not(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
         Atom(Boolean(false)) => (Some(Atom(Boolean(true))), env),
         _ => (Some(Atom(Boolean(false))), env),
     }
+}
+fn builtin_eq(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    if args.len() < 2 {
+        fail!("eq: expect at least two parameters")
+    }
+    let mut state = false;
+    let mut left = args.shift().expect("head of eq args should be Some()");
+    for right in args.move_iter() {
+        state = left == right;
+        left = right;
+    }
+    (Some(Atom(Boolean(state))), env)
 }
 
 // parser impl
@@ -1655,5 +1680,35 @@ mod builtins_tests {
     fn gte_fails_with_less_than_two_args() {
         eval(parse_str(~"(>= 2)"),
              add_builtins(Env::new(None, None, None)));
+    }
+    #[test]
+    fn equal_works() {
+        let (out_expr, _) = eval(parse_str(~"(= 1 1)"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr, Some(Atom(Boolean(true))));
+    }
+    #[test]
+    #[should_fail]
+    fn equal_fails_with_less_than_two_params() {
+        eval(parse_str(~"(= 1)"),
+             add_builtins(Env::new(None, None, None)));
+    }
+    #[test]
+    fn two_identical_lambdas_are_eq() {
+        let (out_expr, _) = eval(parse_str(~"(= (lambda (x) x) (lambda (x) x))"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr, Some(Atom(Boolean(true))));
+    }
+    #[test]
+    fn two_lambdas_with_different_arg_lists_and_matching_bodies_arent_equal() {
+        let (out_expr, _) = eval(parse_str(~"(= (lambda (y) 1) (lambda (x) 1))"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr, Some(Atom(Boolean(false))));
+    }
+    #[test]
+    fn two_lambdas_with_matching_args_lists_and_different_bodies_arent_equal() {
+        let (out_expr, _) = eval(parse_str(~"(= (lambda (y) 1) (lambda (y) 2))"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr, Some(Atom(Boolean(false))));
     }
 }
