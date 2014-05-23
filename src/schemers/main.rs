@@ -48,7 +48,8 @@ pub enum AtomVal {
     Symbol(~str),
     Integer(i64),
     Float(f64),
-    Lambda(LambdaVal)
+    Lambda(LambdaVal),
+    Boolean(bool)
 }
 
 #[deriving(Clone)]
@@ -486,6 +487,16 @@ impl Expr {
                     }
                 }
             },
+            '#' => {
+                // #-prefix parsing
+                match &input {
+                    v if *v == ~"#f" => Atom(Boolean(false)),
+                    v if *v == ~"#false" => Atom(Boolean(false)),
+                    v if *v == ~"#t" => Atom(Boolean(true)),
+                    v if *v == ~"#true" => Atom(Boolean(true)),
+                    _ => fail!("un-implemented case of #-prefixing")
+                }
+            }
             _ => Atom(Symbol(input))
         }
     }
@@ -573,14 +584,15 @@ impl AtomVal {
             &Symbol(ref v) => v.to_owned(),
             &Integer(ref v) => v.to_str(),
             &Float(ref v) => v.to_str(),
-            &Lambda(ref v) => v.print()
+            &Lambda(ref v) => v.print(),
+            &Boolean(ref v) => ~"#" + format!("{}", v.to_str().char_at(0))
         }
     }
 }
 
 #[cfg(test)]
-mod parser_test {
-    use super::{pad_input, tokenize, parse, Atom, List, Symbol, Integer, Float, parse_str};
+mod parser_tests {
+    use super::{pad_input, tokenize, parse, Atom, List, Symbol, Integer, Float, parse_str, Boolean};
 
     #[test]
     fn pad_input_should_insert_spaces_before_and_after_parens() {
@@ -709,11 +721,22 @@ mod parser_test {
         }
         assert_eq!(expr.print(), ~"(x y z)")
     }
+    #[test]
+    fn can_parse_boolean_literals() {
+        let false_atom = parse_str(~"#f");
+        assert_eq!(false_atom, Atom(Boolean(false)));
+        let true_atom = parse_str(~"#t");
+        assert_eq!(true_atom, Atom(Boolean(true)));
+        let false_atom = parse_str(~"#false");
+        assert_eq!(false_atom, Atom(Boolean(false)));
+        let true_atom = parse_str(~"#true");
+        assert_eq!(true_atom, Atom(Boolean(true)));
+    }
 }
 
 #[cfg(test)]
-mod eval_test {
-    use super::{add_globals, parse_str, Atom, List, Lambda, Symbol, Integer, Float,
+mod eval_tests {
+    use super::{add_builtins, parse_str, Atom, List, Lambda, Symbol, Integer, Float,
                        Env, eval, UserDefined};
     mod un_cons {
         use super::super::{parse_str, Atom, List, Symbol};
