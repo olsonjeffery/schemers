@@ -292,6 +292,8 @@ fn add_builtins(mut env: Env) -> Env {
     env.define(~"/", Atom(Lambda(BuiltIn(~"/", builtin_divide))));
     env.define(~"<", Atom(Lambda(BuiltIn(~"<", builtin_lt))));
     env.define(~">", Atom(Lambda(BuiltIn(~">", builtin_gt))));
+    env.define(~"<=", Atom(Lambda(BuiltIn(~"<=", builtin_lte))));
+    env.define(~">=", Atom(Lambda(BuiltIn(~">=", builtin_gte))));
     env.define(~"not", Atom(Lambda(BuiltIn(~"not", builtin_not))));
     env
 }
@@ -545,6 +547,106 @@ fn builtin_gt(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
             match atom {
                 Atom(Integer(right)) => {
                     state = left > right;
+                    left = right;
+                }
+                _ => fail!("greater-than: invoking with non numeric input")
+            }
+        }
+        Atom(Boolean(state))
+    };
+    (Some(out_val), env)
+}
+
+fn builtin_lte(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    let mut hasFloats = false;
+    for atom in args.iter() {
+        match atom {
+            &Atom(Float(_)) => hasFloats = true,
+            &Atom(Integer(_)) => {},
+            val => fail!("less-than: invoking with non numeric input: '{}'", val.print())
+        }
+    }
+    let out_val = if hasFloats {
+        let mut state = false;
+        let mut left = match args.shift()
+            .expect("head of less-than args should be Some()") {
+                left @ Atom(Integer(_)) |
+                left @ Atom(Float(_)) => left.unwrap_float(),
+                _ => fail!("less-than: cannot process non-numeric input")
+        };
+        for atom in args.move_iter() {
+            match atom {
+                right @ Atom(Integer(_)) | right @ Atom(Float(_)) => {
+                    let right = right.unwrap_float();
+                    state = left <= right;
+                    left = right;
+                },
+                _ => fail!("less-than: invoking with non numeric input")
+            }
+        }
+        Atom(Boolean(state))
+    } else {
+        let mut state = false;
+        let mut left = match args.shift()
+            .expect("head of less-than args should be Some()") {
+                left @ Atom(Integer(_))
+                    | left @ Atom(Float(_)) => left.unwrap_integer(),
+                _ => fail!("less-than: cannot process non-numeric input")
+        };
+        for atom in args.move_iter() {
+            match atom {
+                Atom(Integer(right)) => {
+                    state = left <= right;
+                    left = right;
+                }
+                _ => fail!("less-than: invoking with non numeric input")
+            }
+        }
+        Atom(Boolean(state))
+    };
+    (Some(out_val), env)
+}
+
+fn builtin_gte(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    let mut hasFloats = false;
+    for atom in args.iter() {
+        match atom {
+            &Atom(Float(_)) => hasFloats = true,
+            &Atom(Integer(_)) => {},
+            val => fail!("greater-than: invoking with non numeric input: '{}'", val.print())
+        }
+    }
+    let out_val = if hasFloats {
+        let mut state = false;
+        let mut left = match args.shift()
+            .expect("head of greater-than args should be Some()") {
+                left @ Atom(Integer(_)) |
+                left @ Atom(Float(_)) => left.unwrap_float(),
+                _ => fail!("greater-than: cannot process non-numeric input")
+        };
+        for atom in args.move_iter() {
+            match atom {
+                right @ Atom(Integer(_)) | right @ Atom(Float(_)) => {
+                    let right = right.unwrap_float();
+                    state = left >= right;
+                    left = right;
+                },
+                _ => fail!("greater-than: invoking with non numeric input")
+            }
+        }
+        Atom(Boolean(state))
+    } else {
+        let mut state = false;
+        let mut left = match args.shift()
+            .expect("head of greater-than args should be Some()") {
+                left @ Atom(Integer(_))
+                    | left @ Atom(Float(_)) => left.unwrap_integer(),
+                _ => fail!("greater-than: cannot process non-numeric input")
+        };
+        for atom in args.move_iter() {
+            match atom {
+                Atom(Integer(right)) => {
+                    state = left >= right;
                     left = right;
                 }
                 _ => fail!("greater-than: invoking with non numeric input")
@@ -1423,70 +1525,54 @@ mod builtins_tests {
         assert_eq!(out_expr.unwrap(), Atom(Integer(2)));
     }
     #[test]
-    fn two_is_less_than_four() {
+    fn lt_works() {
         let env = add_builtins(Env::new(None, None, None));
         let in_expr = parse_str(~"(< 2 4)");
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, env) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
-    }
-    #[test]
-    fn five_is_not_less_than_one() {
-        let env = add_builtins(Env::new(None, None, None));
         let in_expr = parse_str(~"(< 5 1)");
+        let (out_expr, env) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+        let in_expr = parse_str(~"(< 1.1 1.2)");
+        let (out_expr, env) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+        let in_expr = parse_str(~"(< 1.1 2)");
+        let (out_expr, env) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+        let in_expr = parse_str(~"(< 1.0 1)");
+        let (out_expr, env) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+        let in_expr = parse_str(~"(< 1 1)");
         let (out_expr, _) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
     }
     #[test]
-    fn one_point_one_is_less_than_one_point_two() {
-        let env = add_builtins(Env::new(None, None, None));
-        let in_expr = parse_str(~"(< 1.1 1.2)");
-        let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
-    }
-    #[test]
-    fn one_point_one_is_less_than_two() {
-        let env = add_builtins(Env::new(None, None, None));
-        let in_expr = parse_str(~"(< 1.1 2)");
-        let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
-    }
-    #[test]
-    fn four_is_greater_than_two() {
+    fn gt_works() {
         let env = add_builtins(Env::new(None, None, None));
         let in_expr = parse_str(~"(> 4 2)");
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, env) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
-    }
-    #[test]
-    fn one_is_not_greater_than_five() {
-        let env = add_builtins(Env::new(None, None, None));
         let in_expr = parse_str(~"(> 1 5)");
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, env) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
-    }
-    #[test]
-    fn one_point_two_is_greater_than_one_point_one() {
-        let env = add_builtins(Env::new(None, None, None));
         let in_expr = parse_str(~"(> 1.2 1.1)");
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, env) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
-    }
-    #[test]
-    fn two_is_greater_than_one_point_one() {
-        let env = add_builtins(Env::new(None, None, None));
         let in_expr = parse_str(~"(> 2 1.1)");
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr,env) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
-    }
-    #[test]
-    fn a_call_to_not_with_false_returns_true() {
-        let env = add_builtins(Env::new(None, None, None));
         let in_expr = parse_str(~"(not #f)");
         let (out_expr, env) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
         let in_expr = parse_str(~"(not (quote #f))");
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, env) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+        let in_expr = parse_str(~"(> 1.0 1)");
+        let (out_expr, env) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+        let in_expr = parse_str(~"(> 1 1)");
+        let (out_expr, _) = eval(in_expr, env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
     }
     #[test]
     fn a_call_to_not_with_anything_that_isnt_false_returns_false() {
@@ -1505,5 +1591,33 @@ mod builtins_tests {
         assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
         let (out_expr, _) = eval(parse_str(~"(not (+ 1 1))"), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+    }
+    #[test]
+    fn gte_works() {
+        let env = add_builtins(Env::new(None, None, None));
+        let (out_expr, env) = eval(parse_str(~"(>= 2 2)"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+        let (out_expr, env) = eval(parse_str(~"(>= 2 2.0)"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+        let (out_expr, env) = eval(parse_str(~"(>= 2 1.9)"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+        let (out_expr, env) = eval(parse_str(~"(>= 1.9 2)"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+        let (out_expr, _) = eval(parse_str(~"(>= 1 2)"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+    }
+    #[test]
+    fn lte_works() {
+        let env = add_builtins(Env::new(None, None, None));
+        let (out_expr, env) = eval(parse_str(~"(<= 2 2)"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+        let (out_expr, env) = eval(parse_str(~"(<= 2 2.0)"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+        let (out_expr, env) = eval(parse_str(~"(<= 2 1.9)"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+        let (out_expr, env) = eval(parse_str(~"(<= 1.9 2)"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+        let (out_expr, _) = eval(parse_str(~"(<= 1 2)"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
     }
 }
