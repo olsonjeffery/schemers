@@ -459,6 +459,9 @@ fn builtin_divide(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
 
 fn builtin_lt(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     let mut hasFloats = false;
+    if args.len() < 2 {
+        fail!("<: too few parameters (must provide at least two)");
+    }
     for atom in args.iter() {
         match atom {
             &Atom(Float(_)) => hasFloats = true,
@@ -509,6 +512,9 @@ fn builtin_lt(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
 
 fn builtin_gt(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     let mut hasFloats = false;
+    if args.len() < 2 {
+        fail!("<: too few parameters (must provide at least two)");
+    }
     for atom in args.iter() {
         match atom {
             &Atom(Float(_)) => hasFloats = true,
@@ -559,6 +565,9 @@ fn builtin_gt(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
 
 fn builtin_lte(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     let mut hasFloats = false;
+    if args.len() < 2 {
+        fail!("<: too few parameters (must provide at least two)");
+    }
     for atom in args.iter() {
         match atom {
             &Atom(Float(_)) => hasFloats = true,
@@ -609,6 +618,9 @@ fn builtin_lte(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
 
 fn builtin_gte(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     let mut hasFloats = false;
+    if args.len() < 2 {
+        fail!("<: too few parameters (must provide at least two)");
+    }
     for atom in args.iter() {
         match atom {
             &Atom(Float(_)) => hasFloats = true,
@@ -1619,5 +1631,29 @@ mod builtins_tests {
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
         let (out_expr, _) = eval(parse_str(~"(<= 1 2)"), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+    }
+    #[test]
+    #[should_fail]
+    fn lt_fails_with_less_than_two_args() {
+        eval(parse_str(~"(< 2)"),
+             add_builtins(Env::new(None, None, None)));
+    }
+    #[test]
+    #[should_fail]
+    fn gt_fails_with_less_than_two_args() {
+        eval(parse_str(~"(> 2)"),
+             add_builtins(Env::new(None, None, None)));
+    }
+    #[test]
+    #[should_fail]
+    fn lte_fails_with_less_than_two_args() {
+        eval(parse_str(~"(<= 2)"),
+             add_builtins(Env::new(None, None, None)));
+    }
+    #[test]
+    #[should_fail]
+    fn gte_fails_with_less_than_two_args() {
+        eval(parse_str(~"(>= 2)"),
+             add_builtins(Env::new(None, None, None)));
     }
 }
