@@ -27,8 +27,11 @@ fn main() {
     }
     let program: ~str = args.move_iter()
         .fold(~"", |memo, arg| memo + arg + " ").trim().to_owned();
-    let parsed_items = parse_str(program);
-    println!("{}", parsed_items.print());
+    let env = add_builtins(Env::new(None, None, None));
+    match eval(parse_str(program), env) {
+        (Some(expr), _) => println!("=> {}", expr.print()),
+        _ => {}
+    }
 }
 
 // Language data
