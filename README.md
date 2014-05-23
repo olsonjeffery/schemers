@@ -24,7 +24,7 @@ In no particular order:
 #### Feature Work
 
 * Tackle the contents Peter Norvig's [second essay on the same topic][Norvig2], notably:
-  * More `Atom` types (strings, bools, complex numbers, etc)
+  * More `Atom` types (strings, <s>bools</s>, complex numbers, etc)
   * Macros
   * TCO
   * Better error detection/parsing
