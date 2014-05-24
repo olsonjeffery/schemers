@@ -11,6 +11,7 @@ In no particular order:
 #### Cleanup/completeness
 
 * Implement the contents of `add_globals`, test cases that appear near the end of [the first essay][Norvig1]
+* Implement a proper REPL
 * Work on the actual API:
   * It is quite hideous right now, with `fail!`s all over the place
   * Should replace with `Result`-based API (would definitely ease error-reporting centralization, as well as improving overall grossness)
@@ -18,6 +19,7 @@ In no particular order:
 * Port to a newer version of Rust (waiting for `~str` removal to land)
 * Refactor code layout:
   * It's all one big file with impl plus tests (closing in on a 1,000 line, ewww)
+  * Split the project into lib and bin projects
   * Probably drop tests into their own module so a LOC grep can just hit the impl modules
   * __API Documentation__
 
