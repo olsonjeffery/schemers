@@ -311,6 +311,7 @@ fn add_builtins(mut env: Env) -> Env {
     env.define(~"eq?", Atom(Lambda(BuiltIn(~"eq?", builtin_eq))));
     env.define(~"equal?", Atom(Lambda(BuiltIn(~"equal?", builtin_eq))));
     env.define(~"length", Atom(Lambda(BuiltIn(~"length", builtin_length))));
+    env.define(~"cons", Atom(Lambda(BuiltIn(~"cons", builtin_cons))));
     env
 }
 fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
@@ -717,6 +718,12 @@ fn builtin_length(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
         _ => fail!("length: expecting a list parameter")
     }
 }
+fn builtin_cons(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    if args.len() != 2 {
+        fail!("cons: expects two parameters")
+    }
+    (Some(Expr::cons(args.shift().unwrap(), args.shift().unwrap())), env)
+}
 
 // parser impl
 fn parse_str(input: ~str) -> Expr {
@@ -851,6 +858,17 @@ impl Expr {
             }
             _ => Atom(Symbol(input))
         }
+    }
+
+    pub fn cons(car: Expr, cdr: Expr) -> Expr {
+        let mut new_items = vec!(~car);
+        match cdr {
+            v @ Atom(_) => new_items.push(~v),
+            List(cdr_items) => for i in cdr_items.move_iter() {
+                new_items.push(i);
+            }
+        }
+        List(new_items)
     }
 
     pub fn print(&self) -> ~str {
@@ -1742,6 +1760,36 @@ mod builtins_tests {
     #[should_fail]
     fn getting_the_length_of_an_atom_value_should_fail() {
         eval(parse_str(~"(length 1)"),
+            add_builtins(Env::new(None, None, None)));
+    }
+    #[test]
+    fn cons_should_combine_two_atoms_into_a_new_list() {
+        let (out_expr, _) = eval(parse_str(~"(cons 1 2)"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr.unwrap().print(), ~"(1 2)");
+    }
+    #[test]
+    fn cons_should_combine_an_atom_and_a_list_into_a_new_list() {
+        let (out_expr, _) = eval(parse_str(~"(cons 1 (quote (2 3)))"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr.unwrap().print(), ~"(1 2 3)");
+    }
+    #[test]
+    fn cons_should_combone_a_list_car_and_a_nested_list_cdr_correctly() {
+        let (out_expr, _) = eval(parse_str(~"(cons (quote (1 2 3)) (quote ((4 5 6))))"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr.unwrap().print(), ~"((1 2 3) (4 5 6))");
+    }
+    #[test]
+    #[should_fail]
+    fn cons_should_fail_with_one_arg() {
+        eval(parse_str(~"(cons 1)"),
+            add_builtins(Env::new(None, None, None)));
+    }
+    #[test]
+    #[should_fail]
+    fn cons_should_fail_with_more_than_two_args() {
+        eval(parse_str(~"(cons 1 2 3)"),
             add_builtins(Env::new(None, None, None)));
     }
 }
