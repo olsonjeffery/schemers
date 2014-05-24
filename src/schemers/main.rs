@@ -13,7 +13,7 @@ extern crate collections = "collections";
 use std::from_str::FromStr;
 use std::fmt::{Show, Formatter, Result};
 use collections::hashmap::HashMap;
-use std::num::{from_f64, from_i64};
+use std::num::{from_f64, from_i64, from_uint};
 
 // this is starting out as a straight port of Peter Norvig's
 // lis.py (the first iteration) to Rust
@@ -308,6 +308,9 @@ fn add_builtins(mut env: Env) -> Env {
     env.define(~">=", Atom(Lambda(BuiltIn(~">=", builtin_gte))));
     env.define(~"not", Atom(Lambda(BuiltIn(~"not", builtin_not))));
     env.define(~"=", Atom(Lambda(BuiltIn(~"=", builtin_eq))));
+    env.define(~"eq?", Atom(Lambda(BuiltIn(~"eq?", builtin_eq))));
+    env.define(~"equal?", Atom(Lambda(BuiltIn(~"equal?", builtin_eq))));
+    env.define(~"length", Atom(Lambda(BuiltIn(~"length", builtin_length))));
     env
 }
 fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
@@ -701,6 +704,18 @@ fn builtin_eq(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
         left = right;
     }
     (Some(Atom(Boolean(state))), env)
+}
+fn builtin_length(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    if args.len() > 1 {
+        fail!("length: expects only a single list parameter")
+    }
+    match args.shift().expect("head of length args should be Some()") {
+        List(items) => {
+            let len_val: i64 = from_uint(items.len()).unwrap();
+            (Some(Atom(Integer(len_val))), env)
+        }
+        _ => fail!("length: expecting a list parameter")
+    }
 }
 
 // parser impl
@@ -1710,5 +1725,23 @@ mod builtins_tests {
         let (out_expr, _) = eval(parse_str(~"(= (lambda (y) 1) (lambda (y) 2))"),
              add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr, Some(Atom(Boolean(false))));
+    }
+    #[test]
+    fn getting_the_length_of_a_three_element_list_should_return_three() {
+        let (out_expr, _) = eval(parse_str(~"(length (quote (1 2 3)))"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr, Some(Atom(Integer(3))));
+    }
+    #[test]
+    fn getting_the_length_of_an_empty_list_should_return_zero() {
+        let (out_expr, _) = eval(parse_str(~"(length (quote ()))"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr, Some(Atom(Integer(0))));
+    }
+    #[test]
+    #[should_fail]
+    fn getting_the_length_of_an_atom_value_should_fail() {
+        eval(parse_str(~"(length 1)"),
+            add_builtins(Env::new(None, None, None)));
     }
 }
