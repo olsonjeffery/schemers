@@ -312,6 +312,8 @@ fn add_builtins(mut env: Env) -> Env {
     env.define(~"equal?", Atom(Lambda(BuiltIn(~"equal?", builtin_eq))));
     env.define(~"length", Atom(Lambda(BuiltIn(~"length", builtin_length))));
     env.define(~"cons", Atom(Lambda(BuiltIn(~"cons", builtin_cons))));
+    env.define(~"car", Atom(Lambda(BuiltIn(~"car", builtin_car))));
+    env.define(~"cdr", Atom(Lambda(BuiltIn(~"cdr", builtin_cdr))));
     env
 }
 fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
@@ -723,6 +725,26 @@ fn builtin_cons(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
         fail!("cons: expects two parameters")
     }
     (Some(Expr::cons(args.shift().unwrap(), args.shift().unwrap())), env)
+}
+fn builtin_car(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    if args.len() != 1 {
+        fail!("car: expect a single list parameter");
+    }
+    let (car, _) = match args.pop().unwrap() {
+        v @ List(_) => v.un_cons(),
+        _ => fail!("car: expected a list")
+    };
+    (Some(car), env)
+}
+fn builtin_cdr(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    if args.len() != 1 {
+        fail!("cdr: expect a single list parameter");
+    }
+    let (_, cdr) = match args.pop().unwrap() {
+        v @ List(_) => v.un_cons(),
+        _ => fail!("cdr: expected a list")
+    };
+    (Some(cdr), env)
 }
 
 // parser impl
@@ -1790,6 +1812,36 @@ mod builtins_tests {
     #[should_fail]
     fn cons_should_fail_with_more_than_two_args() {
         eval(parse_str(~"(cons 1 2 3)"),
+            add_builtins(Env::new(None, None, None)));
+    }
+    #[test]
+    fn car_should_pull_the_first_element_from_a_list() {
+        let (out_expr, _) = eval(parse_str(~"(car (quote (1 2 3)))"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr.unwrap().print(), ~"1");
+    }
+    #[test]
+    #[should_fail]
+    fn car_should_fail_when_applied_to_an_atom_value() {
+        eval(parse_str(~"(car 1)"),
+            add_builtins(Env::new(None, None, None)));
+    }
+    #[test]
+    fn cdr_should_pull_the_remaining_elements_from_a_list() {
+        let (out_expr, _) = eval(parse_str(~"(cdr (quote (1 2 3)))"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr.unwrap().print(), ~"(2 3)");
+    }
+    #[test]
+    fn cdr_should_return_an_empty_list_when_applied_to_a_single_element_list() {
+        let (out_expr, _) = eval(parse_str(~"(cdr (quote (1)))"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr.unwrap().print(), ~"()");
+    }
+    #[test]
+    #[should_fail]
+    fn cdr_should_fail_when_applied_to_an_atom_value() {
+        eval(parse_str(~"(cdr 1)"),
             add_builtins(Env::new(None, None, None)));
     }
 }
