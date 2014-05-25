@@ -314,6 +314,7 @@ fn add_builtins(mut env: Env) -> Env {
     env.define(~"cons", Atom(Lambda(BuiltIn(~"cons", builtin_cons))));
     env.define(~"car", Atom(Lambda(BuiltIn(~"car", builtin_car))));
     env.define(~"cdr", Atom(Lambda(BuiltIn(~"cdr", builtin_cdr))));
+    env.define(~"append", Atom(Lambda(BuiltIn(~"append", builtin_append))));
     env
 }
 fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
@@ -745,6 +746,19 @@ fn builtin_cdr(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
         _ => fail!("cdr: expected a list")
     };
     (Some(cdr), env)
+}
+fn builtin_append(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    if args.len() != 2 {
+        fail!("append: expect two arguments");
+    }
+    let out_items = match args.shift().unwrap() {
+        List(mut items) => {
+            items.push(~args.pop().unwrap());
+            items
+        },
+        _ => fail!("append: expect first arg to be a list")
+    };
+    (Some(List(out_items)), env)
 }
 
 // parser impl
@@ -1842,6 +1856,30 @@ mod builtins_tests {
     #[should_fail]
     fn cdr_should_fail_when_applied_to_an_atom_value() {
         eval(parse_str(~"(cdr 1)"),
+            add_builtins(Env::new(None, None, None)));
+    }
+    #[test]
+    fn append_adds_an_expr_to_the_end_of_a_list() {
+        let (out_expr, _) = eval(parse_str(~"(append (quote (1)) 2)"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr.unwrap().print(), ~"(1 2)");
+    }
+    #[test]
+    #[should_fail]
+    fn append_should_fail_if_the_first_arg_isnt_a_list() {
+        eval(parse_str(~"(append 1 2"),
+            add_builtins(Env::new(None, None, None)));
+    }
+    #[test]
+    #[should_fail]
+    fn append_should_fail_when_passed_one_arg() {
+        eval(parse_str(~"(append (quote (1)))"),
+            add_builtins(Env::new(None, None, None)));
+    }
+    #[test]
+    #[should_fail]
+    fn append_should_fail_with_more_than_two_args() {
+        eval(parse_str(~"(append (quote (1)) 1 2)"),
             add_builtins(Env::new(None, None, None)));
     }
 }
