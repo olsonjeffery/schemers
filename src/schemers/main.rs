@@ -316,6 +316,7 @@ fn add_builtins(mut env: Env) -> Env {
     env.define(~"cdr", Atom(Lambda(BuiltIn(~"cdr", builtin_cdr))));
     env.define(~"append", Atom(Lambda(BuiltIn(~"append", builtin_append))));
     env.define(~"list", Atom(Lambda(BuiltIn(~"list", builtin_list))));
+    env.define(~"list?", Atom(Lambda(BuiltIn(~"list?", builtin_is_list))));
     env
 }
 fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
@@ -763,6 +764,18 @@ fn builtin_append(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
 }
 fn builtin_list(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     (Some(List(args.move_iter().map(|x| ~x).collect())), env)
+}
+fn builtin_is_list(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    if args.len() != 1 {
+        fail!("list?: expect a single argument");
+    }
+    let result = match args.shift().unwrap() {
+        List(_) => {
+            Atom(Boolean(true))
+        },
+        _ => Atom(Boolean(false))
+    };
+    (Some(result), env)
 }
 
 // parser impl
@@ -1899,5 +1912,19 @@ mod builtins_tests {
         assert_eq!(out_expr.unwrap().print(), ~"(1 2 3)");
         let (out_expr, _) = eval(parse_str(~"(list 1 (list 2) 3)"), env);
         assert_eq!(out_expr.unwrap().print(), ~"(1 (2) 3)");
+    }
+    #[test]
+    fn list_predicate_returns_false_for_atom_values() {
+        let (out_expr, _) = eval(parse_str(~"(list? 1)"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+    }
+    #[test]
+    fn list_predicate_returns_true_for_any_list_value() {
+        let (out_expr, env) = eval(parse_str(~"(list? (list))"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+        let (out_expr, _) = eval(parse_str(~"(list? (list 1 2 3))"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
     }
 }
