@@ -315,6 +315,7 @@ fn add_builtins(mut env: Env) -> Env {
     env.define(~"car", Atom(Lambda(BuiltIn(~"car", builtin_car))));
     env.define(~"cdr", Atom(Lambda(BuiltIn(~"cdr", builtin_cdr))));
     env.define(~"append", Atom(Lambda(BuiltIn(~"append", builtin_append))));
+    env.define(~"list", Atom(Lambda(BuiltIn(~"list", builtin_list))));
     env
 }
 fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
@@ -759,6 +760,9 @@ fn builtin_append(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
         _ => fail!("append: expect first arg to be a list")
     };
     (Some(List(out_items)), env)
+}
+fn builtin_list(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    (Some(List(args.move_iter().map(|x| ~x).collect())), env)
 }
 
 // parser impl
@@ -1881,5 +1885,19 @@ mod builtins_tests {
     fn append_should_fail_with_more_than_two_args() {
         eval(parse_str(~"(append (quote (1)) 1 2)"),
             add_builtins(Env::new(None, None, None)));
+    }
+    #[test]
+    fn applying_list_with_zero_args_should_return_an_empty_list() {
+        let (out_expr, _) = eval(parse_str(~"(list)"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr.unwrap().is_null(), true);
+    }
+    #[test]
+    fn applying_list_to_any_number_of_arguments_returns_a_list_of_those_arguments() {
+        let (out_expr, env) = eval(parse_str(~"(list 1 2 3)"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr.unwrap().print(), ~"(1 2 3)");
+        let (out_expr, _) = eval(parse_str(~"(list 1 (list 2) 3)"), env);
+        assert_eq!(out_expr.unwrap().print(), ~"(1 (2) 3)");
     }
 }
