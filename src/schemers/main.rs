@@ -317,6 +317,8 @@ fn add_builtins(mut env: Env) -> Env {
     env.define(~"append", Atom(Lambda(BuiltIn(~"append", builtin_append))));
     env.define(~"list", Atom(Lambda(BuiltIn(~"list", builtin_list))));
     env.define(~"list?", Atom(Lambda(BuiltIn(~"list?", builtin_is_list))));
+    env.define(~"null?", Atom(Lambda(BuiltIn(~"null?", builtin_is_null))));
+    env.define(~"symbol?", Atom(Lambda(BuiltIn(~"symbol?", builtin_is_symbol))));
     env
 }
 fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
@@ -771,6 +773,32 @@ fn builtin_is_list(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     }
     let result = match args.shift().unwrap() {
         List(_) => {
+            Atom(Boolean(true))
+        },
+        _ => Atom(Boolean(false))
+    };
+    (Some(result), env)
+}
+
+fn builtin_is_null(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    if args.len() != 1 {
+        fail!("null?: expect a single argument");
+    }
+    let result = match args.shift().unwrap() {
+        List(ref v) if v.len() == 0 => {
+            Atom(Boolean(true))
+        },
+        _ => Atom(Boolean(false))
+    };
+    (Some(result), env)
+}
+
+fn builtin_is_symbol(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    if args.len() != 1 {
+        fail!("symbol?: expect a single argument");
+    }
+    let result = match args.shift().unwrap() {
+        Atom(Symbol(_)) => {
             Atom(Boolean(true))
         },
         _ => Atom(Boolean(false))
@@ -1926,5 +1954,25 @@ mod builtins_tests {
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
         let (out_expr, _) = eval(parse_str(~"(list? (list 1 2 3))"), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+    }
+    #[test]
+    fn null_predicate_returns_true_only_for_empty_list_values() {
+        let (out_expr, env) = eval(parse_str(~"(null? (list))"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+        let (out_expr, env) = eval(parse_str(~"(null? (quote x))"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+        let (out_expr, _) = eval(parse_str(~"(null? (list 1 2 3))"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+    }
+    #[test]
+    fn symbol_predicate_returns_true_only_for_empty_list_values() {
+        let (out_expr, env) = eval(parse_str(~"(symbol? (list))"),
+             add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
+        let (out_expr, env) = eval(parse_str(~"(symbol? (quote x))"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
+        let (out_expr, _) = eval(parse_str(~"(symbol? 1)"), env);
+        assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
     }
 }
