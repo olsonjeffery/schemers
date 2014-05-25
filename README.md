@@ -10,7 +10,9 @@ In no particular order:
 
 #### Cleanup/completeness
 
-* Implement the contents of `add_globals`, test cases that appear near the end of [the first essay][Norvig1]
+* <s>Implement the contents of `add_globals`
+* make test cases that appear near the end of [the first essay][Norvig1] pass
+  * Transparent swapout of `BigInt` for `Integer` as needed (can we also make this work for `Float`?)
 * Implement a proper REPL
 * Work on the actual API:
   * It is quite hideous right now, with `fail!`s all over the place
