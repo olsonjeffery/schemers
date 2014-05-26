@@ -154,8 +154,8 @@ fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                                         eval(*items.pop()
                                              .expect("eval: set! val not provided"), env);
                                     env.set(name,
-                                            val_expr.expect(
-                                                "eval: set!: provided val didn't resolve to anything"));
+                                        val_expr.expect(
+                                            "eval: set!: provided val didn't resolve"));
                                     (None, env)
                                 },
                                 _ => fail!("eval: set!: atom in var name position must be symbol")
@@ -1053,6 +1053,7 @@ mod Number {
     use std::char;
     use std::strbuf::StrBuf;
     use std::num::Zero;
+    #[allow(dead_code)]
     pub fn integer(val: i64) -> AtomVal {
         let bi: BigInt = FromPrimitive::from_i64(val)
             .expect("Number::integer: should be able to unwrap i64->BigInt");
