@@ -323,6 +323,7 @@ fn add_builtins(mut env: Env) -> Env {
     env.define(~"list?", Atom(Lambda(BuiltIn(~"list?", builtin_is_list))));
     env.define(~"null?", Atom(Lambda(BuiltIn(~"null?", builtin_is_null))));
     env.define(~"symbol?", Atom(Lambda(BuiltIn(~"symbol?", builtin_is_symbol))));
+    env.define(~"display", Atom(Lambda(BuiltIn(~"display", builtin_display))));
     env
 }
 fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
@@ -718,11 +719,12 @@ fn builtin_eq(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     (Some(Atom(Boolean(state))), env)
 }
 fn builtin_length(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
-    if args.len() > 1 {
+    if args.len() != 1 {
         fail!("length: expects only a single list parameter")
     }
     match args.shift().expect("head of length args should be Some()") {
         List(items) => {
+            println!("length: {}", items.len());
             (Some(Atom(Number::uint(items.len()))), env)
         }
         _ => fail!("length: expecting a list parameter")
@@ -809,6 +811,14 @@ fn builtin_is_symbol(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     (Some(result), env)
 }
 
+fn builtin_display(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    if args.len() != 1 {
+        fail!("display: expect a single argument");
+    }
+    println!("{}", args.shift().unwrap().print());
+    (None, env)
+}
+
 // parser impl
 fn read(input: ~str) -> Expr {
     parse(&mut tokenize(input))
@@ -816,6 +826,7 @@ fn read(input: ~str) -> Expr {
 
 fn pad_input(input: ~str) -> ~str {
     input.replace("(", " ( ").replace(")", " ) ")
+        .replace("\t", " ").replace("\n", " ").replace("\r", " ")
 }
 
 fn strip_commas(input: ~str) -> ~str {
@@ -2044,6 +2055,9 @@ mod builtins_tests {
 
     #[test]
     fn norvig_suite_1() {
+        use std::num::strconv;
+        use to_str = std::num::strconv::float_to_str_common;
+        use std::from_str::FromStr;
         let one = ~"(define area (lambda (r) (* 3.141592653 (* r r))))";
         let (_, env) = eval(read(one),
                             add_builtins(Env::new(None, None, None)));
@@ -2067,10 +2081,59 @@ mod builtins_tests {
         let (out_expr, env) = eval(read(four), env);
         assert_eq!(out_expr.unwrap().print(), ~"3628800");
         let five = ~"(fact 100)";
-        let (out_expr, _) = eval(read(five), env);
+        let (out_expr, env) = eval(read(five), env);
         assert_eq!(out_expr.unwrap().print(), ~"9332621544394415268169923885626"+
                    "67004907159682643816214685929638952175999932299156089414639"+
                    "76156518286253697920827223758251185210916864000000000000000"+
                    "000000000");
+        let six = ~"(area (fact 10))";
+        let (out_expr, env) = eval(read(six), env);
+        let fl_val: f64 = FromStr::from_str(out_expr.unwrap().print())
+            .expect("should be able to resolve value from printed bigrat");
+        let (out_val, _) = to_str(fl_val, 10u, true,
+                          strconv::SignNone, strconv::DigMax(10), strconv::ExpDec, false);
+        assert_eq!(out_val,
+                   ~"4.1369087198e13");
+        let seven = ~"(define first car)";
+        let (_, env) = eval(read(seven), env);
+        let seven = ~"(define rest cdr)";
+        let (_, env) = eval(read(seven), env);
+        let eight =
+            ~"(define count \
+                (lambda (item L acc) \
+                    (begin
+                        (display (list item L acc)) \
+                        (if (> 1 (length L)) \
+                            acc \
+                            (count item (rest L) (if (equal? item (first L)) \
+                                                     (+ acc 1) \
+                                                     acc))) \
+                    ) \
+                ) \
+            )";
+        let (_, env) = eval(read(eight), env);
+        let nine = ~"(count 0 (list 0 1 2 3 0 0) 0)";
+        let (out_expr, env) = eval(read(nine), env);
+        assert_eq!(out_expr.unwrap().print(), ~"3");
+        let ten = ~"(count (quote the) (quote (the more the merrier \
+                the bigger the better)) 0)";
+        let (out_expr, _) = eval(read(ten), env);
+        assert_eq!(out_expr.unwrap().print(), ~"4");
+    }
+
+    #[test]
+    fn syntactic_keyword_in_lambda_doesnt_choke() {
+        let eight = ~"(define foo (lambda (x) (begin (display (quote foo)) 2 x)))";
+        let (_, env) = eval(read(eight),
+                            add_builtins(Env::new(None, None, None)));
+        let (out_expr, _) = eval(read(~"(foo (list 1 2 3))"), env);
+        assert_eq!(out_expr.unwrap().print(), ~"(1 2 3)");
+    }
+    #[test]
+    fn test_length_of_list_in_if() {
+        let env = add_builtins(Env::new(None, None, None));
+        let nine = ~"(if (> 1 (length (list 1 2 3))) (quote conseq) (quote alt))";
+        let (out_expr, _) = eval(read(nine), env);
+        assert_eq!(out_expr.unwrap().print(), ~"alt");
     }
 }
