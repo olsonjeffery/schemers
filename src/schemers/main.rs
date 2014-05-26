@@ -9,11 +9,14 @@
 #![license = "3-Clause BSD"]
 
 extern crate collections = "collections";
+extern crate num = "num";
 
 use std::from_str::FromStr;
 use std::fmt::{Show, Formatter, Result};
 use collections::hashmap::HashMap;
-use std::num::{from_f64, from_i64, from_uint};
+use std::num::One;
+use num::rational::{Ratio, BigRational};
+use num::bigint::BigInt;
 
 // this is starting out as a straight port of Peter Norvig's
 // lis.py (the first iteration) to Rust
@@ -49,8 +52,8 @@ pub enum Expr {
 #[deriving(Eq, Show, Clone)]
 pub enum AtomVal {
     Symbol(~str),
-    Integer(i64),
-    Float(f64),
+    Integer(BigInt),
+    Float(BigRational),
     Lambda(LambdaVal),
     Boolean(bool)
 }
@@ -81,17 +84,17 @@ impl Eq for LambdaVal {
             &UserDefined(ref name, ref args, ref body) => match other {
                 &UserDefined(ref other_name, ref other_args, ref other_body) =>
                     name == other_name &&
-                    {
-                        if args.len() != other_args.len() {
-                            return false;
-                        }
-                        let mut args_match = true;
-                        for ctr in range(0, args.len()) {
-                            args_match = args.get(ctr)
-                                == other_args.get(ctr);
-                        }
-                        args_match
-                    } &&
+                {
+                    if args.len() != other_args.len() {
+                        return false;
+                    }
+                    let mut args_match = true;
+                    for ctr in range(0, args.len()) {
+                        args_match = args.get(ctr)
+                            == other_args.get(ctr);
+                    }
+                    args_match
+                } &&
                     body == other_body,
                 &BuiltIn(_, _) => false
             },
@@ -151,8 +154,8 @@ fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                                         eval(*items.pop()
                                              .expect("eval: set! val not provided"), env);
                                     env.set(name,
-                                      val_expr.expect(
-                                          "eval: set!: provided val didn't resolve to anything"));
+                                            val_expr.expect(
+                                                "eval: set!: provided val didn't resolve to anything"));
                                     (None, env)
                                 },
                                 _ => fail!("eval: set!: atom in var name position must be symbol")
@@ -210,28 +213,28 @@ fn eval_define(cdr: Expr, env: Env) -> Env {
             }
             match *items.shift()
                 .expect("eval: define: var name should have value") {
-                Atom(Symbol(name)) => {
-                    let val_expr = *items.pop().expect("eval: define: value should be there");
-                    let (val_expr, mut env) = {
-                        if val_expr.is_atom() {
-                            eval(val_expr , env)
-                        } else {
-                            let (car, cdr) = val_expr.clone().un_cons();
-                            match car {
-                                Atom(ref val) if *val == Symbol(~"lambda") => {
-                                    (eval_lambda(name.to_owned(), cdr), env)
+                    Atom(Symbol(name)) => {
+                        let val_expr = *items.pop().expect("eval: define: value should be there");
+                        let (val_expr, mut env) = {
+                            if val_expr.is_atom() {
+                                eval(val_expr , env)
+                            } else {
+                                let (car, cdr) = val_expr.clone().un_cons();
+                                match car {
+                                    Atom(ref val) if *val == Symbol(~"lambda") => {
+                                        (eval_lambda(name.to_owned(), cdr), env)
+                                    }
+                                    _ => eval(val_expr , env)
                                 }
-                                _ => eval(val_expr , env)
                             }
-                        }
-                    };
-                    env.define(name,
-                      val_expr.expect(
-                          "eval: define: val expr should return something"));
-                    env
-                },
-                _ => fail!("eval: define: atom in var pos. must be symbol")
-            }
+                        };
+                        env.define(name,
+                                   val_expr.expect(
+                                       "eval: define: val expr should return something"));
+                        env
+                    },
+                    _ => fail!("eval: define: atom in var pos. must be symbol")
+                }
         },
         _ => fail!("eval: define: expected list in cdr position")
     }
@@ -257,7 +260,7 @@ fn eval_lambda(name: ~str, cdr: Expr) -> Option<Expr> {
                 }, _ => fail!("eval: lambda: expect vars to be list")
             }
             Some(Atom(Lambda(UserDefined(name, var_names, items.shift()
-                                    .expect("eval: lambda: lambda body should be there")))))
+                                         .expect("eval: lambda: lambda body should be there")))))
         },
         _ => fail!("eval: lambda: expected list in cdr position")
     }
@@ -336,11 +339,11 @@ fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
             .expect("head of add args should be Some()") {
                 v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.unwrap_float(),
                 _ => fail!("add: cannot process non-numeric input")
-        };
+            };
         for atom in args.move_iter() {
             match atom {
                 v @ Atom(Integer(_)) | v @ Atom(Float(_)) =>
-                    out_val += v.unwrap_float(),
+                    out_val = out_val + v.unwrap_float(),
                 _ => fail!("add: invoking with non numeric input")
             }
         }
@@ -350,10 +353,10 @@ fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
             .expect("head of add args should be Some()") {
                 v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.unwrap_integer(),
                 _ => fail!("add: cannot process non-numeric input")
-        };
-        for atom in args.iter() {
+            };
+        for atom in args.move_iter() {
             match atom {
-                &Atom(Integer(val)) => out_val += val,
+                Atom(Integer(val)) => out_val = out_val + val,
                 _ => fail!("add: invoking with non numeric input")
             }
         }
@@ -376,11 +379,11 @@ fn builtin_subtract(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
             .expect("head of subtract args should be Some()") {
                 v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.unwrap_float(),
                 _ => fail!("subtract: cannot process non-numeric input")
-        };
+            };
         for atom in args.move_iter() {
             match atom {
                 v @ Atom(Integer(_)) | v @ Atom(Float(_)) =>
-                    out_val -= v.unwrap_float(),
+                    out_val = out_val - v.unwrap_float(),
                 _ => fail!("subtract: invoking with non numeric input")
             }
         }
@@ -390,10 +393,10 @@ fn builtin_subtract(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
             .expect("head of subtract args should be Some()") {
                 v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.unwrap_integer(),
                 _ => fail!("subtract: cannot process non-numeric input")
-        };
-        for atom in args.iter() {
+            };
+        for atom in args.move_iter() {
             match atom {
-                &Atom(Integer(val)) => out_val -= val,
+                Atom(Integer(val)) => out_val = out_val - val,
                 _ => fail!("subtract: invoking with non numeric input")
             }
         }
@@ -416,11 +419,11 @@ fn builtin_multiply(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
             .expect("head of multiply args should be Some()") {
                 v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.unwrap_float(),
                 _ => fail!("multiply: cannot process non-numeric input")
-        };
+            };
         for atom in args.move_iter() {
             match atom {
                 v @ Atom(Integer(_)) | v @ Atom(Float(_)) =>
-                    out_val *= v.unwrap_float(),
+                    out_val = out_val * v.unwrap_float(),
                 _ => fail!("multiply: invoking with non numeric input")
             }
         }
@@ -430,10 +433,10 @@ fn builtin_multiply(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
             .expect("head of multiply args should be Some()") {
                 v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.unwrap_integer(),
                 _ => fail!("multiply: cannot process non-numeric input")
-        };
-        for atom in args.iter() {
+            };
+        for atom in args.move_iter() {
             match atom {
-                &Atom(Integer(val)) => out_val *= val,
+                Atom(Integer(val)) => out_val = out_val * val,
                 _ => fail!("multiply: invoking with non numeric input")
             }
         }
@@ -456,11 +459,11 @@ fn builtin_divide(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
             .expect("head of divide args should be Some()") {
                 v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.unwrap_float(),
                 _ => fail!("divide: cannot process non-numeric input")
-        };
+            };
         for atom in args.move_iter() {
             match atom {
                 v @ Atom(Integer(_)) | v @ Atom(Float(_)) =>
-                    out_val /= v.unwrap_float(),
+                    out_val = out_val / v.unwrap_float(),
                 _ => fail!("divide: invoking with non numeric input")
             }
         }
@@ -470,10 +473,10 @@ fn builtin_divide(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
             .expect("head of divide args should be Some()") {
                 v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.unwrap_integer(),
                 _ => fail!("divide: cannot process non-numeric input")
-        };
-        for atom in args.iter() {
+            };
+        for atom in args.move_iter() {
             match atom {
-                &Atom(Integer(val)) => out_val /= val,
+                Atom(Integer(val)) => out_val = out_val / val,
                 _ => fail!("divide: invoking with non numeric input")
             }
         }
@@ -501,7 +504,7 @@ fn builtin_lt(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
                 left @ Atom(Integer(_)) |
                 left @ Atom(Float(_)) => left.unwrap_float(),
                 _ => fail!("less-than: cannot process non-numeric input")
-        };
+            };
         for atom in args.move_iter() {
             match atom {
                 right @ Atom(Integer(_)) | right @ Atom(Float(_)) => {
@@ -520,7 +523,7 @@ fn builtin_lt(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
                 left @ Atom(Integer(_))
                     | left @ Atom(Float(_)) => left.unwrap_integer(),
                 _ => fail!("less-than: cannot process non-numeric input")
-        };
+            };
         for atom in args.move_iter() {
             match atom {
                 Atom(Integer(right)) => {
@@ -554,7 +557,7 @@ fn builtin_gt(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
                 left @ Atom(Integer(_)) |
                 left @ Atom(Float(_)) => left.unwrap_float(),
                 _ => fail!("greater-than: cannot process non-numeric input")
-        };
+            };
         for atom in args.move_iter() {
             match atom {
                 right @ Atom(Integer(_)) | right @ Atom(Float(_)) => {
@@ -573,7 +576,7 @@ fn builtin_gt(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
                 left @ Atom(Integer(_))
                     | left @ Atom(Float(_)) => left.unwrap_integer(),
                 _ => fail!("greater-than: cannot process non-numeric input")
-        };
+            };
         for atom in args.move_iter() {
             match atom {
                 Atom(Integer(right)) => {
@@ -607,7 +610,7 @@ fn builtin_lte(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
                 left @ Atom(Integer(_)) |
                 left @ Atom(Float(_)) => left.unwrap_float(),
                 _ => fail!("less-than: cannot process non-numeric input")
-        };
+            };
         for atom in args.move_iter() {
             match atom {
                 right @ Atom(Integer(_)) | right @ Atom(Float(_)) => {
@@ -626,7 +629,7 @@ fn builtin_lte(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
                 left @ Atom(Integer(_))
                     | left @ Atom(Float(_)) => left.unwrap_integer(),
                 _ => fail!("less-than: cannot process non-numeric input")
-        };
+            };
         for atom in args.move_iter() {
             match atom {
                 Atom(Integer(right)) => {
@@ -660,7 +663,7 @@ fn builtin_gte(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
                 left @ Atom(Integer(_)) |
                 left @ Atom(Float(_)) => left.unwrap_float(),
                 _ => fail!("greater-than: cannot process non-numeric input")
-        };
+            };
         for atom in args.move_iter() {
             match atom {
                 right @ Atom(Integer(_)) | right @ Atom(Float(_)) => {
@@ -679,7 +682,7 @@ fn builtin_gte(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
                 left @ Atom(Integer(_))
                     | left @ Atom(Float(_)) => left.unwrap_integer(),
                 _ => fail!("greater-than: cannot process non-numeric input")
-        };
+            };
         for atom in args.move_iter() {
             match atom {
                 Atom(Integer(right)) => {
@@ -720,8 +723,7 @@ fn builtin_length(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     }
     match args.shift().expect("head of length args should be Some()") {
         List(items) => {
-            let len_val: i64 = from_uint(items.len()).unwrap();
-            (Some(Atom(Integer(len_val))), env)
+            (Some(Atom(Number::uint(items.len()))), env)
         }
         _ => fail!("length: expecting a list parameter")
     }
@@ -915,9 +917,11 @@ impl Expr {
             '6' | '7' | '8' | '9' => {
                 match input.contains(".") {
                     true => {
-                        match FromStr::from_str(input) {
-                            Some(val) => Atom(Float(val)),
-                            None => fail!("Cannot parse number-like input of: {}", input)
+                        let parsed_val: Option<f64>
+                            = FromStr::from_str(input);
+                        match parsed_val {
+                            Some(val) => Atom(Number::float(val)),
+                            None => fail!("Cannot parse number-like input of: '{}'", input)
                         }
                     },
                     false => {
@@ -1013,16 +1017,16 @@ impl Expr {
             _ => fail!("calling unbox on non-List expr")
         }
     }
-    pub fn unwrap_float(self) -> f64 {
+    pub fn unwrap_float(self) -> BigRational {
         match self {
-            Atom(Integer(v)) => from_i64(v).unwrap(),
+            Atom(Integer(v)) => Ratio::new(v, One::one()),
             Atom(Float(v)) => v,
             _ => fail!("calling unwrap_float() on non-numeric value")
         }
     }
-    pub fn unwrap_integer(self) -> i64 {
+    pub fn unwrap_integer(self) -> BigInt {
         match self {
-            Atom(Float(v)) => from_f64(v).unwrap(),
+            Atom(Float(v)) => v.numer().clone(),
             Atom(Integer(v)) => v,
             _ => fail!("calling unwrap_integer() on non-numeric value")
         }
@@ -1034,16 +1038,69 @@ impl AtomVal {
         match self {
             &Symbol(ref v) => v.to_owned(),
             &Integer(ref v) => v.to_str(),
-            &Float(ref v) => v.to_str(),
+            &Float(ref v) => Number::float_print(v),
             &Lambda(ref v) => v.print(),
             &Boolean(ref v) => ~"#" + format!("{}", v.to_str().char_at(0))
         }
     }
 }
 
+mod Number {
+    use super::{AtomVal, Integer, Float};
+    use num::bigint::BigInt;
+    use num::rational::{Ratio, BigRational};
+    use collections::TreeSet;
+    use std::char;
+    use std::strbuf::StrBuf;
+    use std::num::Zero;
+    pub fn integer(val: i64) -> AtomVal {
+        let bi: BigInt = FromPrimitive::from_i64(val)
+            .expect("Number::integer: should be able to unwrap i64->BigInt");
+        Integer(bi)
+    }
+    pub fn uint(val: uint) -> AtomVal {
+        let bi: BigInt = FromPrimitive::from_uint(val)
+            .expect("Number::uint: should be able to unwrap uint->BigInt");
+        Integer(bi)
+    }
+    pub fn float(val: f64) -> AtomVal {
+        let br = Ratio::from_float(val)
+            .expect("Number::float: should be able to unwrap f64->BigInt");
+        Float(br)
+    }
+    // adapted from https://gist.github.com/kballard/4771f0d338fbb1896446
+    pub fn float_print(v: &BigRational) -> ~str {
+        let mut s = StrBuf::from_owned_str(v.to_integer().to_str());
+        let mut v = v.fract();
+        if !v.is_zero() {
+            s.push_char('.');
+            let ten: BigInt = FromPrimitive::from_int(10).unwrap();
+            let ten = Ratio::from_integer(ten);
+            let mut seen = TreeSet::new();
+            while !v.is_zero() {
+                v = v * ten;
+                if seen.contains(&v) {
+                    s.push_str("…");
+                    break;
+                }
+                seen.insert(v.clone());
+                let digit = v.to_integer(); // should only be 1 digit
+                // bail out when we hit a zero in the decimal portion
+                if digit.is_zero() {
+                    break;
+                }
+                s.push_char(char::from_digit(digit.to_uint().unwrap(), 10).unwrap());
+                v = v.fract();
+            }
+        }
+        s.into_owned()
+    }
+}
+
 #[cfg(test)]
 mod parser_tests {
-    use super::{pad_input, tokenize, parse, Atom, List, Symbol, Integer, Float, read, Boolean};
+    use super::{pad_input, tokenize, parse, Atom, List, Symbol,
+                read, Boolean, Number};
 
     #[test]
     fn pad_input_should_insert_spaces_before_and_after_parens() {
@@ -1077,8 +1134,8 @@ mod parser_tests {
         let tokens = &mut tokenize(~"42");
         let parsed_item = parse(tokens);
         match parsed_item {
-            Atom(Integer(val)) => {
-                assert_eq!(val, 42)
+            Atom(val) => {
+                assert_eq!(val, Number::integer(42))
             },
             _ => assert!(false)
         }
@@ -1088,8 +1145,8 @@ mod parser_tests {
         let tokens = &mut tokenize(~"1.1");
         let parsed_item = parse(tokens);
         match parsed_item {
-            Atom(Float(val)) => {
-                assert_eq!(val, 1.1)
+            Atom(val) => {
+                assert_eq!(val, Number::float(1.1))
             },
             _ => assert!(false)
         }
@@ -1107,9 +1164,9 @@ mod parser_tests {
                 assert_eq!(items.get(0).is_atom(), true);
                 assert_eq!(*items.get(0), ~Atom(Symbol(~"bar")));
                 assert_eq!(items.get(1).is_atom(), true);
-                assert_eq!(*items.get(1), ~Atom(Integer(12)));
+                assert_eq!(*items.get(1), ~Atom(Number::integer(12)));
                 assert_eq!(items.get(2).is_atom(), true);
-                assert_eq!(*items.get(2), ~Atom(Integer(45)));
+                assert_eq!(*items.get(2), ~Atom(Number::integer(45)));
             },
             _ => fail!("got back an atom, it seems")
         }
@@ -1126,13 +1183,13 @@ mod parser_tests {
                 match *items.get(0) {
                     ~List(ref items) => {
                         assert_eq!(items.len(), 2);
-                        assert_eq!(*items.get(0), ~Atom(Integer(2)));
-                        assert_eq!(*items.get(1), ~Atom(Integer(3)));
+                        assert_eq!(*items.get(0), ~Atom(Number::integer(2)));
+                        assert_eq!(*items.get(1), ~Atom(Number::integer(3)));
                     },
                     _ => fail!("shoulda got a list")
                 }
                 assert_eq!(*items.get(1), ~Atom(Symbol(~"bar")));
-                assert_eq!(*items.get(2), ~Atom(Integer(12)));
+                assert_eq!(*items.get(2), ~Atom(Number::integer(12)));
                 match *items.get(3) {
                     ~List(ref items) => {
                         assert_eq!(items.len(), 2);
@@ -1187,8 +1244,8 @@ mod parser_tests {
 
 #[cfg(test)]
 mod eval_tests {
-    use super::{add_builtins, read, Atom, List, Lambda, Symbol, Integer, Float,
-                       Env, eval, UserDefined};
+    use super::{add_builtins, read, Atom, List, Lambda, Symbol,
+                Env, eval, UserDefined, Number};
     mod un_cons {
         use super::super::{read, Atom, List, Symbol};
         #[should_fail]
@@ -1234,11 +1291,12 @@ mod eval_tests {
     fn given_a_symbol_in_the_env_then_calling_eval_should_resolve_its_value() {
         let env = Env::new(
             Some(vec!(~"x")),
-            Some(vec!(Atom(Integer(42)))),
+            Some(vec!(Atom(Number::integer(42)))),
             None);
         let in_expr = read(~"x");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.expect("should return an expr"), Atom(Integer(42)));
+        assert_eq!(out_expr.expect("should return an expr"),
+                   Atom(Number::integer(42)));
     }
 
     #[test]
@@ -1254,7 +1312,7 @@ mod eval_tests {
         let env = Env::new(None, None, None);
         let in_expr = read(~"34.3");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Float(34.3)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::float(34.3)));
     }
 
     #[test]
@@ -1262,7 +1320,7 @@ mod eval_tests {
         let env = Env::new(None, None, None);
         let in_expr = read(~"34");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Integer(34)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::integer(34)));
     }
 
     #[test]
@@ -1270,7 +1328,7 @@ mod eval_tests {
         let env = Env::new(None, None, None);
         let in_expr = read(~"(quote 42)");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Integer(42)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::integer(42)));
     }
 
     #[test]
@@ -1290,7 +1348,7 @@ mod eval_tests {
             List(items) => {
                 assert_eq!(items.len(), 2);
                 assert_eq!(*items.get(0), ~Atom(Symbol(~"x")));
-                assert_eq!(*items.get(1), ~Atom(Integer(37)));
+                assert_eq!(*items.get(1), ~Atom(Number::integer(37)));
             },
             _ => fail!("expected a list")
         }
@@ -1341,7 +1399,7 @@ mod eval_tests {
         let (out_expr, _) = eval(in_expr, env);
         match out_expr.unwrap() {
             list @ List(_) => {
-               assert_eq!(list.is_null(), true);
+                assert_eq!(list.is_null(), true);
             },
             _ => fail!("expect a list")
         }
@@ -1358,40 +1416,40 @@ mod eval_tests {
     #[test]
     fn calling_set_on_a_var_in_the_scope_should_succeed() {
         let env = Env::new(
-            Some(vec!(~"x")), Some(vec!(Atom(Integer(42)))),
+            Some(vec!(~"x")), Some(vec!(Atom(Number::integer(42)))),
             None);
         let in_expr = read(~"(set! x 123)");
         let (_, env) = eval(in_expr, env);
-        assert_eq!(env.find(&~"x"), Atom(Integer(123)));
+        assert_eq!(env.find(&~"x"), Atom(Number::integer(123)));
     }
 
     #[test]
     fn calling_set_should_resolve_the_val() {
         let env = Env::new(
-            Some(vec!(~"x")), Some(vec!(Atom(Integer(42)))),
+            Some(vec!(~"x")), Some(vec!(Atom(Number::integer(42)))),
             None);
         let in_expr = read(~"(set! x (quote 37))");
         let (_, env) = eval(in_expr, env);
-        assert_eq!(env.find(&~"x"), Atom(Integer(37)));
+        assert_eq!(env.find(&~"x"), Atom(Number::integer(37)));
     }
 
     #[test]
     fn calling_set_on_a_var_in_an_outer_scope_should_succeed() {
         let outer_env = Env::new(
-            Some(vec!(~"x")), Some(vec!(Atom(Integer(42)))),
+            Some(vec!(~"x")), Some(vec!(Atom(Number::integer(42)))),
             None);
         let env = Env::new(
             None, None,
             Some(outer_env));
         let in_expr = read(~"(set! x 43)");
         let (_, env) = eval(in_expr, env);
-        assert_eq!(env.find(&~"x"), Atom(Integer(43)));
+        assert_eq!(env.find(&~"x"), Atom(Number::integer(43)));
     }
 
     #[test]
     fn set_should_return_a_None_for_the_out_expr() {
         let env = Env::new(
-            Some(vec!(~"x")), Some(vec!(Atom(Integer(42)))),
+            Some(vec!(~"x")), Some(vec!(Atom(Number::integer(42)))),
             None);
         let in_expr = read(~"(set! x 43)");
         let (result, _) = eval(in_expr, env);
@@ -1409,12 +1467,12 @@ mod eval_tests {
     #[test]
     fn an_if_test_that_returns_a_None_out_expr_should_run_the_conseq_branch() {
         let env = Env::new(
-            Some(vec!(~"x")), Some(vec!(Atom(Integer(42)))),
+            Some(vec!(~"x")), Some(vec!(Atom(Number::integer(42)))),
             None);
         let in_expr = read(~"(if (set! x 37) (quote conseq) (quote alt))");
         let (out_expr, env) = eval(in_expr, env);
         assert_eq!(out_expr.unwrap(), Atom(Symbol(~"conseq")));
-        assert_eq!(env.find(&~"x"), Atom(Integer(37)));
+        assert_eq!(env.find(&~"x"), Atom(Number::integer(37)));
     }
 
     #[test]
@@ -1435,7 +1493,7 @@ mod eval_tests {
         let env = Env::new(None, None, None);
         let in_expr = read(~"(define x 123)");
         let (_, env) = eval(in_expr, env);
-        assert_eq!(env.find(&~"x"), Atom(Integer(123)));
+        assert_eq!(env.find(&~"x"), Atom(Number::integer(123)));
     }
 
     #[test]
@@ -1449,14 +1507,14 @@ mod eval_tests {
     #[test]
     fn defining_a_var_already_set_in_an_outer_scope_should_shadow_it_in_the_inner_scope() {
         let outer_env = Env::new(
-            Some(vec!(~"x")), Some(vec!(Atom(Integer(42)))),
+            Some(vec!(~"x")), Some(vec!(Atom(Number::integer(42)))),
             None);
         let env = Env::new(None, None, Some(outer_env));
         let in_expr = read(~"(define x 37)");
         let (_, env) = eval(in_expr, env);
-        assert_eq!(env.find(&~"x"), Atom(Integer(37)));
+        assert_eq!(env.find(&~"x"), Atom(Number::integer(37)));
         let outer_env = env.unwrap_parent();
-        assert_eq!(outer_env.find(&~"x"), Atom(Integer(42)));
+        assert_eq!(outer_env.find(&~"x"), Atom(Number::integer(42)));
     }
 
     #[test]
@@ -1470,7 +1528,7 @@ mod eval_tests {
                     UserDefined(_, vars, body) => {
                         assert_eq!(vars.len(), 1);
                         assert_eq!(vars.get(0), &~"x");
-                        assert_eq!(*body, Atom(Integer(37)));
+                        assert_eq!(*body, Atom(Number::integer(37)));
                     }, _ => fail!("expected a UserDefined")
                 }
             }, _ => fail!("expected atom w/ lambda")
@@ -1532,15 +1590,15 @@ mod eval_tests {
         let env = Env::new(None, None, None);
         let in_expr = read(~"(begin (define x 37) 42)");
         let (out_expr, env) = eval(in_expr, env);
-        assert_eq!(env.find(&~"x"), Atom(Integer(37)));
-        assert_eq!(out_expr.unwrap(), Atom(Integer(42)));
+        assert_eq!(env.find(&~"x"), Atom(Number::integer(37)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::integer(42)));
     }
     #[test]
     fn begin_should_return_no_expr_if_its_tail_param_returns_nothing() {
         let env = Env::new(None, None, None);
         let in_expr = read(~"(begin (define x 37))");
         let (out_expr, env) = eval(in_expr, env);
-        assert_eq!(env.find(&~"x"), Atom(Integer(37)));
+        assert_eq!(env.find(&~"x"), Atom(Number::integer(37)));
         assert_eq!(out_expr, None);
     }
     #[test]
@@ -1548,13 +1606,13 @@ mod eval_tests {
         let env = Env::new(None, None, None);
         let in_expr = read(~"(begin (define x 37) (quote (1 x 3.4)))");
         let (out_expr, env) = eval(in_expr, env);
-        assert_eq!(env.find(&~"x"), Atom(Integer(37)));
+        assert_eq!(env.find(&~"x"), Atom(Number::integer(37)));
         match out_expr.unwrap() {
             List(items) => {
                 assert_eq!(items.len(), 3);
-                assert_eq!(*items.get(0), ~Atom(Integer(1)));
+                assert_eq!(*items.get(0), ~Atom(Number::integer(1)));
                 assert_eq!(*items.get(1), ~Atom(Symbol(~"x")));
-                assert_eq!(*items.get(2), ~Atom(Float(3.4)));
+                assert_eq!(*items.get(2), ~Atom(Number::float(3.4)));
             }, _ => fail!("expected a list")
         }
     }
@@ -1563,7 +1621,7 @@ mod eval_tests {
         let env = Env::new(None, None, None);
         let in_expr = read(~"(begin (define set! 42) (set! set! 37) set!)");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Integer(37)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::integer(37)));
     }
 
     #[test]
@@ -1573,7 +1631,7 @@ mod eval_tests {
         let (_, env) = eval(in_expr, env);
         let in_expr = read(~"(get-1)");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Integer(1)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::integer(1)));
     }
 
     #[test]
@@ -1582,7 +1640,7 @@ mod eval_tests {
         let in_expr = read(
             ~"(begin (define double (lambda (x) (+ x x))) (double 3))");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Integer(6)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::integer(6)));
     }
 
     #[test]
@@ -1596,91 +1654,91 @@ mod eval_tests {
 
 #[cfg(test)]
 mod builtins_tests {
-    use super::{read, add_builtins, eval, Env, Atom, Integer, Float,
-        Boolean};
+    use super::{read, add_builtins, eval, Env, Atom,
+                Boolean, Number};
     #[test]
     fn two_plus_two_equals_four() {
         let env = add_builtins(Env::new(None, None, None));
         let in_expr = read(~"(+ 2 2)");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Integer(4)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::integer(4)));
     }
     #[test]
     fn can_sum_an_arbitrary_number_of_items() {
         let env = add_builtins(Env::new(None, None, None));
         let in_expr = read(~"(+ 2 2 1 1 1 1 4)");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Integer(12)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::integer(12)));
     }
     #[test]
     fn two_point_five_plus_two_equals_four_point_five() {
         let env = add_builtins(Env::new(None, None, None));
         let in_expr = read(~"(+ 2.5 2)");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Float(4.5)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::float(4.5)));
     }
     #[test]
     fn four_minus_three_equals_one() {
         let env = add_builtins(Env::new(None, None, None));
         let in_expr = read(~"(- 4 3)");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Integer(1)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::integer(1)));
     }
     #[test]
     fn four_point_five_minus_one_equals_equals_three_point_five() {
         let env = add_builtins(Env::new(None, None, None));
         let in_expr = read(~"(- 4.5 1)");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Float(3.5)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::float(3.5)));
     }
     #[test]
     fn can_subtract_an_arbitrary_number_of_items() {
         let env = add_builtins(Env::new(None, None, None));
         let in_expr = read(~"(- 4.5 1 3)");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Float(0.5)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::float(0.5)));
     }
     #[test]
     fn two_times_twenty_one_equals_42() {
         let env = add_builtins(Env::new(None, None, None));
         let in_expr = read(~"(* 2 21)");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Integer(42)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::integer(42)));
     }
     #[test]
     fn can_multiply_an_aribtrary_number_of_items() {
         let env = add_builtins(Env::new(None, None, None));
         let in_expr = read(~"(* 4 5 3)");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Integer(60)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::integer(60)));
     }
     #[test]
     fn two_times_one_point_five_equals_three() {
         let env = add_builtins(Env::new(None, None, None));
         let in_expr = read(~"(* 2 1.5)");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Float(3.0)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::float(3.0)));
     }
     #[test]
     fn ten_divided_by_5_equals_2() {
         let env = add_builtins(Env::new(None, None, None));
         let in_expr = read(~"(/ 10 5)");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Integer(2)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::integer(2)));
     }
     #[test]
     fn five_divided_by_two_point_five_equals_2() {
         let env = add_builtins(Env::new(None, None, None));
         let in_expr = read(~"(/ 5 2.5)");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Float(2.0)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::float(2.0)));
     }
     #[test]
     fn can_divide_an_arbitrary_number_of_items() {
         let env = add_builtins(Env::new(None, None, None));
         let in_expr = read(~"(/ 100 10 5)");
         let (out_expr, _) = eval(in_expr, env);
-        assert_eq!(out_expr.unwrap(), Atom(Integer(2)));
+        assert_eq!(out_expr.unwrap(), Atom(Number::integer(2)));
     }
     #[test]
     fn lt_works() {
@@ -1805,7 +1863,7 @@ mod builtins_tests {
     #[test]
     fn equal_works() {
         let (out_expr, _) = eval(read(~"(= 1 1)"),
-             add_builtins(Env::new(None, None, None)));
+                                 add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr, Some(Atom(Boolean(true))));
     }
     #[test]
@@ -1817,133 +1875,133 @@ mod builtins_tests {
     #[test]
     fn two_identical_lambdas_are_eq() {
         let (out_expr, _) = eval(read(~"(= (lambda (x) x) (lambda (x) x))"),
-             add_builtins(Env::new(None, None, None)));
+                                 add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr, Some(Atom(Boolean(true))));
     }
     #[test]
     fn two_lambdas_with_different_arg_lists_and_matching_bodies_arent_equal() {
         let (out_expr, _) = eval(read(~"(= (lambda (y) 1) (lambda (x) 1))"),
-             add_builtins(Env::new(None, None, None)));
+                                 add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr, Some(Atom(Boolean(false))));
     }
     #[test]
     fn two_lambdas_with_matching_args_lists_and_different_bodies_arent_equal() {
         let (out_expr, _) = eval(read(~"(= (lambda (y) 1) (lambda (y) 2))"),
-             add_builtins(Env::new(None, None, None)));
+                                 add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr, Some(Atom(Boolean(false))));
     }
     #[test]
     fn getting_the_length_of_a_three_element_list_should_return_three() {
         let (out_expr, _) = eval(read(~"(length (quote (1 2 3)))"),
-             add_builtins(Env::new(None, None, None)));
-        assert_eq!(out_expr, Some(Atom(Integer(3))));
+                                 add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr, Some(Atom(Number::integer(3))));
     }
     #[test]
     fn getting_the_length_of_an_empty_list_should_return_zero() {
         let (out_expr, _) = eval(read(~"(length (quote ()))"),
-             add_builtins(Env::new(None, None, None)));
-        assert_eq!(out_expr, Some(Atom(Integer(0))));
+                                 add_builtins(Env::new(None, None, None)));
+        assert_eq!(out_expr, Some(Atom(Number::integer(0))));
     }
     #[test]
     #[should_fail]
     fn getting_the_length_of_an_atom_value_should_fail() {
         eval(read(~"(length 1)"),
-            add_builtins(Env::new(None, None, None)));
+             add_builtins(Env::new(None, None, None)));
     }
     #[test]
     fn cons_should_combine_two_atoms_into_a_new_list() {
         let (out_expr, _) = eval(read(~"(cons 1 2)"),
-             add_builtins(Env::new(None, None, None)));
+                                 add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr.unwrap().print(), ~"(1 2)");
     }
     #[test]
     fn cons_should_combine_an_atom_and_a_list_into_a_new_list() {
         let (out_expr, _) = eval(read(~"(cons 1 (quote (2 3)))"),
-             add_builtins(Env::new(None, None, None)));
+                                 add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr.unwrap().print(), ~"(1 2 3)");
     }
     #[test]
     fn cons_should_combone_a_list_car_and_a_nested_list_cdr_correctly() {
         let (out_expr, _) = eval(read(~"(cons (quote (1 2 3)) (quote ((4 5 6))))"),
-             add_builtins(Env::new(None, None, None)));
+                                 add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr.unwrap().print(), ~"((1 2 3) (4 5 6))");
     }
     #[test]
     #[should_fail]
     fn cons_should_fail_with_one_arg() {
         eval(read(~"(cons 1)"),
-            add_builtins(Env::new(None, None, None)));
+             add_builtins(Env::new(None, None, None)));
     }
     #[test]
     #[should_fail]
     fn cons_should_fail_with_more_than_two_args() {
         eval(read(~"(cons 1 2 3)"),
-            add_builtins(Env::new(None, None, None)));
+             add_builtins(Env::new(None, None, None)));
     }
     #[test]
     fn car_should_pull_the_first_element_from_a_list() {
         let (out_expr, _) = eval(read(~"(car (quote (1 2 3)))"),
-             add_builtins(Env::new(None, None, None)));
+                                 add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr.unwrap().print(), ~"1");
     }
     #[test]
     #[should_fail]
     fn car_should_fail_when_applied_to_an_atom_value() {
         eval(read(~"(car 1)"),
-            add_builtins(Env::new(None, None, None)));
+             add_builtins(Env::new(None, None, None)));
     }
     #[test]
     fn cdr_should_pull_the_remaining_elements_from_a_list() {
         let (out_expr, _) = eval(read(~"(cdr (quote (1 2 3)))"),
-             add_builtins(Env::new(None, None, None)));
+                                 add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr.unwrap().print(), ~"(2 3)");
     }
     #[test]
     fn cdr_should_return_an_empty_list_when_applied_to_a_single_element_list() {
         let (out_expr, _) = eval(read(~"(cdr (quote (1)))"),
-             add_builtins(Env::new(None, None, None)));
+                                 add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr.unwrap().print(), ~"()");
     }
     #[test]
     #[should_fail]
     fn cdr_should_fail_when_applied_to_an_atom_value() {
         eval(read(~"(cdr 1)"),
-            add_builtins(Env::new(None, None, None)));
+             add_builtins(Env::new(None, None, None)));
     }
     #[test]
     fn append_adds_an_expr_to_the_end_of_a_list() {
         let (out_expr, _) = eval(read(~"(append (quote (1)) 2)"),
-             add_builtins(Env::new(None, None, None)));
+                                 add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr.unwrap().print(), ~"(1 2)");
     }
     #[test]
     #[should_fail]
     fn append_should_fail_if_the_first_arg_isnt_a_list() {
         eval(read(~"(append 1 2"),
-            add_builtins(Env::new(None, None, None)));
+             add_builtins(Env::new(None, None, None)));
     }
     #[test]
     #[should_fail]
     fn append_should_fail_when_passed_one_arg() {
         eval(read(~"(append (quote (1)))"),
-            add_builtins(Env::new(None, None, None)));
+             add_builtins(Env::new(None, None, None)));
     }
     #[test]
     #[should_fail]
     fn append_should_fail_with_more_than_two_args() {
         eval(read(~"(append (quote (1)) 1 2)"),
-            add_builtins(Env::new(None, None, None)));
+             add_builtins(Env::new(None, None, None)));
     }
     #[test]
     fn applying_list_with_zero_args_should_return_an_empty_list() {
         let (out_expr, _) = eval(read(~"(list)"),
-             add_builtins(Env::new(None, None, None)));
+                                 add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr.unwrap().is_null(), true);
     }
     #[test]
     fn applying_list_to_any_number_of_arguments_returns_a_list_of_those_arguments() {
         let (out_expr, env) = eval(read(~"(list 1 2 3)"),
-             add_builtins(Env::new(None, None, None)));
+                                   add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr.unwrap().print(), ~"(1 2 3)");
         let (out_expr, _) = eval(read(~"(list 1 (list 2) 3)"), env);
         assert_eq!(out_expr.unwrap().print(), ~"(1 (2) 3)");
@@ -1951,13 +2009,13 @@ mod builtins_tests {
     #[test]
     fn list_predicate_returns_false_for_atom_values() {
         let (out_expr, _) = eval(read(~"(list? 1)"),
-             add_builtins(Env::new(None, None, None)));
+                                 add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
     }
     #[test]
     fn list_predicate_returns_true_for_any_list_value() {
         let (out_expr, env) = eval(read(~"(list? (list))"),
-             add_builtins(Env::new(None, None, None)));
+                                   add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
         let (out_expr, _) = eval(read(~"(list? (list 1 2 3))"), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
@@ -1965,7 +2023,7 @@ mod builtins_tests {
     #[test]
     fn null_predicate_returns_true_only_for_empty_list_values() {
         let (out_expr, env) = eval(read(~"(null? (list))"),
-             add_builtins(Env::new(None, None, None)));
+                                   add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
         let (out_expr, env) = eval(read(~"(null? (quote x))"), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
@@ -1975,7 +2033,7 @@ mod builtins_tests {
     #[test]
     fn symbol_predicate_returns_true_only_for_empty_list_values() {
         let (out_expr, env) = eval(read(~"(symbol? (list))"),
-             add_builtins(Env::new(None, None, None)));
+                                   add_builtins(Env::new(None, None, None)));
         assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
         let (out_expr, env) = eval(read(~"(symbol? (quote x))"), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
@@ -1987,13 +2045,23 @@ mod builtins_tests {
     fn norvig_suite_1() {
         let one = ~"(define area (lambda (r) (* 3.141592653 (* r r))))";
         let (_, env) = eval(read(one),
-             add_builtins(Env::new(None, None, None)));
+                            add_builtins(Env::new(None, None, None)));
         let two = ~"(area 3)";
         let (out_expr, env) = eval(read(two), env);
-        assert_eq!(out_expr.unwrap().print().contains("28.27433"), true);
-        let three = ~"(define fact (lambda (n) (if (<= n 1) 1 "+
-            "(* n (fact (- n 1))))))";
+        //assert_eq!(out_expr.unwrap().print().contains("28.27433"), true);
+        assert_eq!(out_expr.unwrap().print(), ~"28.274333877");
+        let three = ~"\
+            (define fact2                         \
+                (lambda (n acc)                   \
+                    (if (<= n 1)                  \
+                        acc                       \
+                        (fact2 (- n 1) (* n acc)) \
+                    )                             \
+                )                                 \
+            )";
         let (_, env) = eval(read(three), env);
+        let three_point_five = ~"(define fact (lambda (n) (fact2 n 1)))";
+        let (_, env) = eval(read(three_point_five), env);
         let four = ~"(fact 10)";
         let (out_expr, env) = eval(read(four), env);
         assert_eq!(out_expr.unwrap().print(), ~"3628800");
