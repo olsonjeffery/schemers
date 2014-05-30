@@ -27,7 +27,7 @@ fn main() {
         fail!("no program provided");
     }
     let program: ~str = args.move_iter()
-        .fold(~"", |memo, arg| memo + arg + " ").trim().to_owned();
+        .fold("".to_owned(), |memo, arg| memo + arg + " ").trim().to_owned();
     let env = builtins::add_builtins(env::Env::new(None, None, None));
     match eval::eval(parse::read(program), env) {
         (Some(expr), _) => println!("=> {}", expr.print()),

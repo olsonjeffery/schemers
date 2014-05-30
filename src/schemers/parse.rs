@@ -29,15 +29,15 @@ pub fn parse(tokens: &mut Vec<~str>) -> Expr {
     let current_token =
         tokens.shift().expect("calling parse() w/ empty token list; shouldn't happen");
     match current_token {
-        ref x if *x == ~"(" => {
+        ref x if *x == "(".to_owned() => {
             let mut list = Vec::new();
-            while *tokens.get(0) != ~")" {
+            while *tokens.get(0) != ")".to_owned() {
                 list.push(box parse(tokens));
             }
             tokens.shift();
             List(list)
         },
-        ref x if *x == ~")" => fail!("hit ) token; shouldn't happen"),
+        ref x if *x == ")".to_owned() => fail!("hit ) token; shouldn't happen"),
         x => Expr::new_atom(x)
     }
 }

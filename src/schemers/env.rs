@@ -9,8 +9,8 @@ use collections::hashmap::HashMap;
 use expr::Expr;
 
 pub struct Env {
-    entries: HashMap<~str, Expr>,
-    outer: Option<~Env>
+    entries: HashMap<String, Expr>,
+    outer: Option<Box<Env>>
 }
 
 impl Env {
@@ -37,10 +37,10 @@ impl Env {
         } else {
             fail!("cannot have params & args unset")
         }
-        Env { entries: entries, outer: match outer { Some(e) => Some(~e), None => None } }
+        Env { entries: entries, outer: match outer { Some(e) => Some(box e), None => None } }
     }
 
-    pub fn set(&mut self, symbol: ~str, val: Expr) {
+    pub fn set(&mut self, symbol: String, val: Expr) {
         match self.entries.contains_key(&symbol) {
             true => {
                 self.define(symbol, val);

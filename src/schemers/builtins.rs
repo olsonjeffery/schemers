@@ -10,28 +10,28 @@ use expr::{Expr, Atom, Lambda, BuiltIn, Integer, Float, Symbol,
            Boolean, List, Number};
 
 pub fn add_builtins(mut env: Env) -> Env {
-    env.define(~"+", Atom(Lambda(BuiltIn(~"+", builtin_add))));
-    env.define(~"-", Atom(Lambda(BuiltIn(~"-", builtin_subtract))));
-    env.define(~"*", Atom(Lambda(BuiltIn(~"*", builtin_multiply))));
-    env.define(~"/", Atom(Lambda(BuiltIn(~"/", builtin_divide))));
-    env.define(~"<", Atom(Lambda(BuiltIn(~"<", builtin_lt))));
-    env.define(~">", Atom(Lambda(BuiltIn(~">", builtin_gt))));
-    env.define(~"<=", Atom(Lambda(BuiltIn(~"<=", builtin_lte))));
-    env.define(~">=", Atom(Lambda(BuiltIn(~">=", builtin_gte))));
-    env.define(~"not", Atom(Lambda(BuiltIn(~"not", builtin_not))));
-    env.define(~"=", Atom(Lambda(BuiltIn(~"=", builtin_eq))));
-    env.define(~"eq?", Atom(Lambda(BuiltIn(~"eq?", builtin_eq))));
-    env.define(~"equal?", Atom(Lambda(BuiltIn(~"equal?", builtin_eq))));
-    env.define(~"length", Atom(Lambda(BuiltIn(~"length", builtin_length))));
-    env.define(~"cons", Atom(Lambda(BuiltIn(~"cons", builtin_cons))));
-    env.define(~"car", Atom(Lambda(BuiltIn(~"car", builtin_car))));
-    env.define(~"cdr", Atom(Lambda(BuiltIn(~"cdr", builtin_cdr))));
-    env.define(~"append", Atom(Lambda(BuiltIn(~"append", builtin_append))));
-    env.define(~"list", Atom(Lambda(BuiltIn(~"list", builtin_list))));
-    env.define(~"list?", Atom(Lambda(BuiltIn(~"list?", builtin_is_list))));
-    env.define(~"null?", Atom(Lambda(BuiltIn(~"null?", builtin_is_null))));
-    env.define(~"symbol?", Atom(Lambda(BuiltIn(~"symbol?", builtin_is_symbol))));
-    env.define(~"display", Atom(Lambda(BuiltIn(~"display", builtin_display))));
+    env.define("+".to_owned(), Atom(Lambda(BuiltIn("+".to_owned(), builtin_add))));
+    env.define("-".to_owned(), Atom(Lambda(BuiltIn("-".to_owned(), builtin_subtract))));
+    env.define("*".to_owned(), Atom(Lambda(BuiltIn("*".to_owned(), builtin_multiply))));
+    env.define("/".to_owned(), Atom(Lambda(BuiltIn("/".to_owned(), builtin_divide))));
+    env.define("<".to_owned(), Atom(Lambda(BuiltIn("<".to_owned(), builtin_lt))));
+    env.define(">".to_owned(), Atom(Lambda(BuiltIn(">".to_owned(), builtin_gt))));
+    env.define("<=".to_owned(), Atom(Lambda(BuiltIn("<=".to_owned(), builtin_lte))));
+    env.define(">=".to_owned(), Atom(Lambda(BuiltIn(">=".to_owned(), builtin_gte))));
+    env.define("not".to_owned(), Atom(Lambda(BuiltIn("not".to_owned(), builtin_not))));
+    env.define("=".to_owned(), Atom(Lambda(BuiltIn("=".to_owned(), builtin_eq))));
+    env.define("eq?".to_owned(), Atom(Lambda(BuiltIn("eq?".to_owned(), builtin_eq))));
+    env.define("equal?".to_owned(), Atom(Lambda(BuiltIn("equal?".to_owned(), builtin_eq))));
+    env.define("length".to_owned(), Atom(Lambda(BuiltIn("length".to_owned(), builtin_length))));
+    env.define("cons".to_owned(), Atom(Lambda(BuiltIn("cons".to_owned(), builtin_cons))));
+    env.define("car".to_owned(), Atom(Lambda(BuiltIn("car".to_owned(), builtin_car))));
+    env.define("cdr".to_owned(), Atom(Lambda(BuiltIn("cdr".to_owned(), builtin_cdr))));
+    env.define("append".to_owned(), Atom(Lambda(BuiltIn("append".to_owned(), builtin_append))));
+    env.define("list".to_owned(), Atom(Lambda(BuiltIn("list".to_owned(), builtin_list))));
+    env.define("list?".to_owned(), Atom(Lambda(BuiltIn("list?".to_owned(), builtin_is_list))));
+    env.define("null?".to_owned(), Atom(Lambda(BuiltIn("null?".to_owned(), builtin_is_null))));
+    env.define("symbol?".to_owned(), Atom(Lambda(BuiltIn("symbol?".to_owned(), builtin_is_symbol))));
+    env.define("display".to_owned(), Atom(Lambda(BuiltIn("display".to_owned(), builtin_display))));
     env
 }
 fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
@@ -470,7 +470,7 @@ fn builtin_append(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     }
     let out_items = match args.shift().unwrap() {
         List(mut items) => {
-            items.push(~args.pop().unwrap());
+            items.push(box args.pop().unwrap());
             items
         },
         _ => fail!("append: expect first arg to be a list")
@@ -478,7 +478,7 @@ fn builtin_append(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     (Some(List(out_items)), env)
 }
 fn builtin_list(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
-    (Some(List(args.move_iter().map(|x| ~x).collect())), env)
+    (Some(List(args.move_iter().map(|x| box x).collect())), env)
 }
 fn builtin_is_list(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     if args.len() != 1 {

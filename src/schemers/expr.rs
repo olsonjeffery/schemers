@@ -17,12 +17,12 @@ use eval::eval;
 #[deriving(Eq, Show, Clone)]
 pub enum Expr {
     Atom(AtomVal),
-    List(Vec<~Expr>)
+    List(Vec<Box<Expr>>)
 }
 
 #[deriving(Eq, Show, Clone)]
 pub enum AtomVal {
-    Symbol(~str),
+    Symbol(String),
     Integer(BigInt),
     Float(BigRational),
     Lambda(LambdaVal),
@@ -31,15 +31,15 @@ pub enum AtomVal {
 
 #[deriving(Clone)]
 pub enum LambdaVal {
-    UserDefined(~str, Vec<~str>, ~Expr),
-    BuiltIn(~str, fn(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env))
+    UserDefined(String, Vec<String>, Box<Expr>),
+    BuiltIn(String, fn(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env))
 }
 
 impl LambdaVal {
-    pub fn print(&self) -> ~str {
+    pub fn print(&self) -> String {
         match self {
             &UserDefined(ref name, ref vars, _) => {
-                let var_expr = List(vars.iter().map(|v| ~Atom(Symbol(v.to_owned()))).collect());
+                let var_expr = List(vars.iter().map(|v| box Atom(Symbol(v.to_owned()))).collect());
                 format!("lambda:{}{}", name.to_owned(), var_expr.print())
             },
             &BuiltIn(ref name, _) =>
@@ -88,22 +88,22 @@ impl Show for LambdaVal {
 }
 
 impl Expr {
-    pub fn new_atom(input: ~str) -> Expr {
-        let first_char = input.char_at(0);
+    pub fn new_atom(input: String) -> Expr {
+        let first_char = input.as_slice().char_at(0);
         match first_char {
             '0' | '1' | '2' | '3' | '4' | '5' |
             '6' | '7' | '8' | '9' => {
-                match input.contains(".") {
+                match input.as_slice().contains(".") {
                     true => {
                         let parsed_val: Option<f64>
-                            = FromStr::from_str(input);
+                            = FromStr::from_str(input.as_slice());
                         match parsed_val {
                             Some(val) => Atom(Number::float(val)),
                             None => fail!("Cannot parse number-like input of: '{}'", input)
                         }
                     },
                     false => {
-                        match FromStr::from_str(input) {
+                        match FromStr::from_str(input.as_slice()) {
                             Some(val) => Atom(Integer(val)),
                             None => fail!("Cannot parse number-like input of: {}", input)
                         }
@@ -113,10 +113,10 @@ impl Expr {
             '#' => {
                 // #-prefix parsing
                 match &input {
-                    v if *v == ~"#f" => Atom(Boolean(false)),
-                    v if *v == ~"#false" => Atom(Boolean(false)),
-                    v if *v == ~"#t" => Atom(Boolean(true)),
-                    v if *v == ~"#true" => Atom(Boolean(true)),
+                    v if *v == "#f".to_owned() => Atom(Boolean(false)),
+                    v if *v == "#false".to_owned() => Atom(Boolean(false)),
+                    v if *v == "#t".to_owned() => Atom(Boolean(true)),
+                    v if *v == "#true".to_owned() => Atom(Boolean(true)),
                     _ => fail!("un-implemented case of #-prefixing")
                 }
             }
@@ -125,9 +125,9 @@ impl Expr {
     }
 
     pub fn cons(car: Expr, cdr: Expr) -> Expr {
-        let mut new_items = vec!(~car);
+        let mut new_items = vec!(box car);
         match cdr {
-            v @ Atom(_) => new_items.push(~v),
+            v @ Atom(_) => new_items.push(box v),
             List(cdr_items) => for i in cdr_items.move_iter() {
                 new_items.push(i);
             }
@@ -135,12 +135,12 @@ impl Expr {
         List(new_items)
     }
 
-    pub fn print(&self) -> ~str {
+    pub fn print(&self) -> String {
         match self {
             &List(ref items) => {
                 let out = items.iter().map(|i| i.print())
-                    .fold(~"(", |m, v| m + v + " ");
-                out.trim() + ")"
+                    .fold("(".to_owned(), |m, v| m.append(v.append(" ").as_slice()));
+                out.as_slice().trim().to_owned().append(")")
             },
             &Atom(ref v) => v.print()
         }
@@ -212,13 +212,13 @@ impl Expr {
 }
 
 impl AtomVal {
-    pub fn print(&self) -> ~str {
+    pub fn print(&self) -> String {
         match self {
             &Symbol(ref v) => v.to_owned(),
             &Integer(ref v) => v.to_str(),
             &Float(ref v) => Number::float_print(v),
             &Lambda(ref v) => v.print(),
-            &Boolean(ref v) => ~"#" + format!("{}", v.to_str().char_at(0))
+            &Boolean(ref v) => "#".to_owned().append(format!("{}", v).as_slice())
         }
     }
 }
@@ -229,7 +229,6 @@ pub mod Number {
     use num::rational::{Ratio, BigRational};
     use collections::TreeSet;
     use std::char;
-    use std::strbuf::StrBuf;
     use std::num::Zero;
     #[allow(dead_code)]
     pub fn integer(val: i64) -> AtomVal {
@@ -248,8 +247,8 @@ pub mod Number {
         Float(br)
     }
     // adapted from https://gist.github.com/kballard/4771f0d338fbb1896446
-    pub fn float_print(v: &BigRational) -> ~str {
-        let mut s = StrBuf::from_owned_str(v.to_integer().to_str());
+    pub fn float_print(v: &BigRational) -> String {
+        let mut s = String::from_owned_str(v.to_integer().to_str());
         let mut v = v.fract();
         if !v.is_zero() {
             s.push_char('.');

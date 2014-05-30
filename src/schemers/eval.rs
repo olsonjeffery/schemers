@@ -22,7 +22,7 @@ pub fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
             }
             let (car, cdr) = list.un_cons();
             match car {
-                Atom(ref val) if *val == Symbol(~"quote")  => {
+                Atom(ref val) if *val == Symbol("quote".to_owned())  => {
                     match cdr {
                         List(mut items) =>
                             (Some(*items.shift().expect("eval: quote list shouldnt be empty")),
@@ -30,10 +30,10 @@ pub fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                         _ => fail!("eval: quote: expected List in cdr position")
                     }
                 },
-                Atom(ref val) if *val == Symbol(~"if") => {
+                Atom(ref val) if *val == Symbol("if".to_owned()) => {
                     eval_if(cdr, env)
                 },
-                Atom(ref val) if *val == Symbol(~"set!") => {
+                Atom(ref val) if *val == Symbol("set!".to_owned()) => {
                     match cdr {
                         List(mut items) => {
                             if items.len() != 2 {
@@ -55,13 +55,13 @@ pub fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                         _ => fail!("eval: set!: expected list in cdr position")
                     }
                 },
-                Atom(ref val) if *val == Symbol(~"define") => {
+                Atom(ref val) if *val == Symbol("define".to_owned()) => {
                     (None, eval_define(cdr, env))
                 },
-                Atom(ref val) if *val == Symbol(~"lambda") => {
-                    (eval_lambda(~"anonymous", cdr), env)
+                Atom(ref val) if *val == Symbol("lambda".to_owned()) => {
+                    (eval_lambda("anonymous".to_owned(), cdr), env)
                 },
-                Atom(ref val) if *val == Symbol(~"begin") => {
+                Atom(ref val) if *val == Symbol("begin".to_owned()) => {
                     eval_begin(cdr, env)
                 },
                 // oh boy a procedure call!
@@ -112,7 +112,7 @@ fn eval_define(cdr: Expr, env: Env) -> Env {
                             } else {
                                 let (car, cdr) = val_expr.clone().un_cons();
                                 match car {
-                                    Atom(ref val) if *val == Symbol(~"lambda") => {
+                                    Atom(ref val) if *val == Symbol("lambda".to_owned()) => {
                                         (eval_lambda(name.to_owned(), cdr), env)
                                     }
                                     _ => eval(val_expr , env)
@@ -140,9 +140,9 @@ fn eval_lambda(name: ~str, cdr: Expr) -> Option<Expr> {
             let mut var_names = Vec::new();
             match *items.shift().expect("eval: lambda: vars should be there") {
                 List(vars) => {
-                    for v in vars.iter() {
+                    for v in vars.move_iter() {
                         match v {
-                            &~Atom(Symbol(ref var_name)) => {
+                            box Atom(Symbol(var_name)) => {
                                 var_names.push(var_name.to_owned());
                             },
                             _ => fail!("eval: lambda: var names must be symbols")
