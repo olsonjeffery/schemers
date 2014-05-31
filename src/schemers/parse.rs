@@ -6,8 +6,9 @@
 // except according to those terms.
 
 use expr::{Expr, List};
+pub type ReadResult = Result<Expr, String>;
 
-pub fn read(input: String) -> Expr {
+pub fn read(input: String) -> ReadResult {
     parse(&mut tokenize(input))
 }
 
@@ -25,19 +26,25 @@ pub fn tokenize(input: String) -> Vec<String> {
         .filter(|i| *i != "".as_slice()).map(|i| i.to_string()).collect()
 }
 
-pub fn parse(tokens: &mut Vec<String>) -> Expr {
-    let current_token =
-        tokens.shift().expect("calling parse() w/ empty token list; shouldn't happen");
+pub fn parse(tokens: &mut Vec<String>) -> ReadResult {
+    let current_token = match tokens.shift() {
+        Some(t) => t,
+        None => return Err("parse: calling w/ empty token list; shouldn't happen".to_string())
+    };
     match current_token {
         ref x if *x == "(".to_string() => {
             let mut list = Vec::new();
             while *tokens.get(0) != ")".to_string() {
-                list.push(box parse(tokens));
+                match parse(tokens) {
+                    Ok(expr) => list.push(box expr),
+                    err => return err
+                }
             }
             tokens.shift();
-            List(list)
+            Ok(List(list))
         },
-        ref x if *x == ")".to_string() => fail!("hit ) token; shouldn't happen"),
-        x => Expr::new_atom(x)
+        ref x if *x == ")".to_string() =>
+            Err("hit ) token; shouldn't happen".to_string()),
+        x => Ok(Expr::new_atom(x))
     }
 }

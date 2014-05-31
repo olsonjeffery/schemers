@@ -7,6 +7,7 @@
 #![crate_id="http://olsonjeffery.github.io#schemers:0.0.1"]
 #![desc = "Simple Scheme Interpreter"]
 #![license = "3-Clause BSD"]
+#![feature(macro_rules)]
 
 extern crate collections = "collections";
 extern crate num = "num";
@@ -31,7 +32,11 @@ fn main() {
               .append(" ".as_slice())).as_slice()
         .trim().to_string();
     let env = builtins::add_builtins(env::Env::new(None, None, None));
-    match eval::eval(parse::read(program), env) {
+    let expr = match parse::read(program) {
+        Ok(expr) => expr,
+        Err(err) => fail!("ERROR: {}", err)
+    };
+    match eval::eval(expr, env) {
         (Some(expr), _) => println!("=> {}", expr.print()),
         _ => {}
     }
