@@ -10,28 +10,30 @@ use expr::{Expr, Atom, Lambda, BuiltIn, Integer, Float, Symbol,
            Boolean, List, Number};
 
 pub fn add_builtins(mut env: Env) -> Env {
-    env.define("+".to_owned(), Atom(Lambda(BuiltIn("+".to_owned(), builtin_add))));
-    env.define("-".to_owned(), Atom(Lambda(BuiltIn("-".to_owned(), builtin_subtract))));
-    env.define("*".to_owned(), Atom(Lambda(BuiltIn("*".to_owned(), builtin_multiply))));
-    env.define("/".to_owned(), Atom(Lambda(BuiltIn("/".to_owned(), builtin_divide))));
-    env.define("<".to_owned(), Atom(Lambda(BuiltIn("<".to_owned(), builtin_lt))));
-    env.define(">".to_owned(), Atom(Lambda(BuiltIn(">".to_owned(), builtin_gt))));
-    env.define("<=".to_owned(), Atom(Lambda(BuiltIn("<=".to_owned(), builtin_lte))));
-    env.define(">=".to_owned(), Atom(Lambda(BuiltIn(">=".to_owned(), builtin_gte))));
-    env.define("not".to_owned(), Atom(Lambda(BuiltIn("not".to_owned(), builtin_not))));
-    env.define("=".to_owned(), Atom(Lambda(BuiltIn("=".to_owned(), builtin_eq))));
-    env.define("eq?".to_owned(), Atom(Lambda(BuiltIn("eq?".to_owned(), builtin_eq))));
-    env.define("equal?".to_owned(), Atom(Lambda(BuiltIn("equal?".to_owned(), builtin_eq))));
-    env.define("length".to_owned(), Atom(Lambda(BuiltIn("length".to_owned(), builtin_length))));
-    env.define("cons".to_owned(), Atom(Lambda(BuiltIn("cons".to_owned(), builtin_cons))));
-    env.define("car".to_owned(), Atom(Lambda(BuiltIn("car".to_owned(), builtin_car))));
-    env.define("cdr".to_owned(), Atom(Lambda(BuiltIn("cdr".to_owned(), builtin_cdr))));
-    env.define("append".to_owned(), Atom(Lambda(BuiltIn("append".to_owned(), builtin_append))));
-    env.define("list".to_owned(), Atom(Lambda(BuiltIn("list".to_owned(), builtin_list))));
-    env.define("list?".to_owned(), Atom(Lambda(BuiltIn("list?".to_owned(), builtin_is_list))));
-    env.define("null?".to_owned(), Atom(Lambda(BuiltIn("null?".to_owned(), builtin_is_null))));
-    env.define("symbol?".to_owned(), Atom(Lambda(BuiltIn("symbol?".to_owned(), builtin_is_symbol))));
-    env.define("display".to_owned(), Atom(Lambda(BuiltIn("display".to_owned(), builtin_display))));
+    env.define("+".to_string(), Atom(Lambda(BuiltIn("+".to_string(), builtin_add))));
+    env.define("-".to_string(), Atom(Lambda(BuiltIn("-".to_string(), builtin_subtract))));
+    env.define("*".to_string(), Atom(Lambda(BuiltIn("*".to_string(), builtin_multiply))));
+    env.define("/".to_string(), Atom(Lambda(BuiltIn("/".to_string(), builtin_divide))));
+    env.define("<".to_string(), Atom(Lambda(BuiltIn("<".to_string(), builtin_lt))));
+    env.define(">".to_string(), Atom(Lambda(BuiltIn(">".to_string(), builtin_gt))));
+    env.define("<=".to_string(), Atom(Lambda(BuiltIn("<=".to_string(), builtin_lte))));
+    env.define(">=".to_string(), Atom(Lambda(BuiltIn(">=".to_string(), builtin_gte))));
+    env.define("not".to_string(), Atom(Lambda(BuiltIn("not".to_string(), builtin_not))));
+    env.define("=".to_string(), Atom(Lambda(BuiltIn("=".to_string(), builtin_eq))));
+    env.define("eq?".to_string(), Atom(Lambda(BuiltIn("eq?".to_string(), builtin_eq))));
+    env.define("equal?".to_string(), Atom(Lambda(BuiltIn("equal?".to_string(), builtin_eq))));
+    env.define("length".to_string(), Atom(Lambda(BuiltIn("length".to_string(), builtin_length))));
+    env.define("cons".to_string(), Atom(Lambda(BuiltIn("cons".to_string(), builtin_cons))));
+    env.define("car".to_string(), Atom(Lambda(BuiltIn("car".to_string(), builtin_car))));
+    env.define("cdr".to_string(), Atom(Lambda(BuiltIn("cdr".to_string(), builtin_cdr))));
+    env.define("append".to_string(), Atom(Lambda(BuiltIn("append".to_string(), builtin_append))));
+    env.define("list".to_string(), Atom(Lambda(BuiltIn("list".to_string(), builtin_list))));
+    env.define("list?".to_string(), Atom(Lambda(BuiltIn("list?".to_string(), builtin_is_list))));
+    env.define("null?".to_string(), Atom(Lambda(BuiltIn("null?".to_string(), builtin_is_null))));
+    env.define("symbol?".to_string(),
+               Atom(Lambda(BuiltIn("symbol?".to_string(), builtin_is_symbol))));
+    env.define("display".to_string(),
+               Atom(Lambda(BuiltIn("display".to_string(), builtin_display))));
     env
 }
 fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {

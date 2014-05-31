@@ -15,7 +15,7 @@ pub struct Env {
 
 impl Env {
     pub fn new(
-        params: Option<Vec<~str>>,
+        params: Option<Vec<String>>,
         args: Option<Vec<Expr>>,
         outer: Option<Env>) -> Env {
         let mut entries = HashMap::new();
@@ -24,7 +24,7 @@ impl Env {
             let args = args.expect("args should be a value");
             if params.len() == args.len() {
                 for ctr in range(0,params.len()) {
-                    let var_name = params.get(ctr).to_owned();
+                    let var_name = params.get(ctr).to_string();
                     let arg = args.get(ctr).clone();
                     entries.insert(var_name, arg);
                 }
@@ -53,11 +53,11 @@ impl Env {
         }
     }
 
-    pub fn define(&mut self, symbol: ~str, val: Expr) {
+    pub fn define(&mut self, symbol: String, val: Expr) {
         self.entries.insert(symbol, val);
     }
 
-    pub fn find<'b>(&'b self, symbol: &~str) -> Expr {
+    pub fn find<'b>(&'b self, symbol: &String) -> Expr {
         match self.entries.find(symbol) {
             Some(v) => v.clone(),
             None => {

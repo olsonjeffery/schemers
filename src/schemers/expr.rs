@@ -39,11 +39,11 @@ impl LambdaVal {
     pub fn print(&self) -> String {
         match self {
             &UserDefined(ref name, ref vars, _) => {
-                let var_expr = List(vars.iter().map(|v| box Atom(Symbol(v.to_owned()))).collect());
-                format!("lambda:{}{}", name.to_owned(), var_expr.print())
+                let var_expr = List(vars.iter().map(|v| box Atom(Symbol(v.to_string()))).collect());
+                format!("lambda:{}{}", name.to_string(), var_expr.print())
             },
             &BuiltIn(ref name, _) =>
-                format!("builtin-fn:{}", name.to_owned())
+                format!("builtin-fn:{}", name.to_string())
         }
     }
 }
@@ -83,7 +83,7 @@ impl Show for LambdaVal {
         // The `f.buf` value is of the type `&mut io::Writer`, which is what the
         // write! macro is expecting. Note that this formatting ignores the
         // various flags provided to format strings.
-        write!(f.buf, "{}", self.print())
+        write!(f, "{}", self.print())
     }
 }
 
@@ -113,10 +113,10 @@ impl Expr {
             '#' => {
                 // #-prefix parsing
                 match &input {
-                    v if *v == "#f".to_owned() => Atom(Boolean(false)),
-                    v if *v == "#false".to_owned() => Atom(Boolean(false)),
-                    v if *v == "#t".to_owned() => Atom(Boolean(true)),
-                    v if *v == "#true".to_owned() => Atom(Boolean(true)),
+                    v if *v == "#f".to_string() => Atom(Boolean(false)),
+                    v if *v == "#false".to_string() => Atom(Boolean(false)),
+                    v if *v == "#t".to_string() => Atom(Boolean(true)),
+                    v if *v == "#true".to_string() => Atom(Boolean(true)),
                     _ => fail!("un-implemented case of #-prefixing")
                 }
             }
@@ -139,8 +139,8 @@ impl Expr {
         match self {
             &List(ref items) => {
                 let out = items.iter().map(|i| i.print())
-                    .fold("(".to_owned(), |m, v| m.append(v.append(" ").as_slice()));
-                out.as_slice().trim().to_owned().append(")")
+                    .fold("(".to_string(), |m, v| m.append(v.append(" ").as_slice()));
+                out.as_slice().trim().to_string().append(")")
             },
             &Atom(ref v) => v.print()
         }
@@ -214,11 +214,11 @@ impl Expr {
 impl AtomVal {
     pub fn print(&self) -> String {
         match self {
-            &Symbol(ref v) => v.to_owned(),
+            &Symbol(ref v) => v.to_string(),
             &Integer(ref v) => v.to_str(),
             &Float(ref v) => Number::float_print(v),
             &Lambda(ref v) => v.print(),
-            &Boolean(ref v) => "#".to_owned().append(format!("{}", v).as_slice())
+            &Boolean(ref v) => "#".to_string().append(format!("{}", v).as_slice())
         }
     }
 }
@@ -248,7 +248,7 @@ pub mod Number {
     }
     // adapted from https://gist.github.com/kballard/4771f0d338fbb1896446
     pub fn float_print(v: &BigRational) -> String {
-        let mut s = String::from_owned_str(v.to_integer().to_str());
+        let mut s = v.to_integer().to_str();
         let mut v = v.fract();
         if !v.is_zero() {
             s.push_char('.');
@@ -271,6 +271,6 @@ pub mod Number {
                 v = v.fract();
             }
         }
-        s.into_owned()
+        s.into_string()
     }
 }

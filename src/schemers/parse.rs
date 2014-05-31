@@ -7,37 +7,37 @@
 
 use expr::{Expr, List};
 
-pub fn read(input: ~str) -> Expr {
+pub fn read(input: String) -> Expr {
     parse(&mut tokenize(input))
 }
 
-pub fn pad_input(input: ~str) -> ~str {
+pub fn pad_input(input: String) -> String {
     input.replace("(", " ( ").replace(")", " ) ")
         .replace("\t", " ").replace("\n", " ").replace("\r", " ")
 }
 
-fn strip_commas(input: ~str) -> ~str {
+fn strip_commas(input: String) -> String {
     input.replace(",", " ").replace("  ", " ")
 }
 
-pub fn tokenize(input: ~str) -> Vec<~str> {
-    strip_commas(pad_input(input)).split_str(" ")
-        .filter(|i| *i != "").map(|i| i.to_owned()).collect()
+pub fn tokenize(input: String) -> Vec<String> {
+    strip_commas(pad_input(input)).as_slice().split_str(" ")
+        .filter(|i| *i != "".as_slice()).map(|i| i.to_string()).collect()
 }
 
-pub fn parse(tokens: &mut Vec<~str>) -> Expr {
+pub fn parse(tokens: &mut Vec<String>) -> Expr {
     let current_token =
         tokens.shift().expect("calling parse() w/ empty token list; shouldn't happen");
     match current_token {
-        ref x if *x == "(".to_owned() => {
+        ref x if *x == "(".to_string() => {
             let mut list = Vec::new();
-            while *tokens.get(0) != ")".to_owned() {
+            while *tokens.get(0) != ")".to_string() {
                 list.push(box parse(tokens));
             }
             tokens.shift();
             List(list)
         },
-        ref x if *x == ")".to_owned() => fail!("hit ) token; shouldn't happen"),
+        ref x if *x == ")".to_string() => fail!("hit ) token; shouldn't happen"),
         x => Expr::new_atom(x)
     }
 }

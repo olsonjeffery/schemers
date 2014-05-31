@@ -22,12 +22,14 @@ mod test;
 #[cfg(not(test))]
 fn main() {
     use std::os::args;
-    let args: Vec<~str> = args().move_iter().skip(1).collect();
+    let args: Vec<String> = args().move_iter().skip(1).collect();
     if args.len() == 0 {
         fail!("no program provided");
     }
-    let program: ~str = args.move_iter()
-        .fold("".to_owned(), |memo, arg| memo + arg + " ").trim().to_owned();
+    let program: String = args.move_iter()
+        .fold("".to_string(), |memo, arg| memo.append(arg.as_slice())
+              .append(" ".as_slice())).as_slice()
+        .trim().to_string();
     let env = builtins::add_builtins(env::Env::new(None, None, None));
     match eval::eval(parse::read(program), env) {
         (Some(expr), _) => println!("=> {}", expr.print()),
