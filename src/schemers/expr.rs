@@ -14,13 +14,13 @@ use num::bigint::BigInt;
 use env::Env;
 use eval::eval;
 
-#[deriving(Eq, Show, Clone)]
+#[deriving(PartialEq, Show, Clone)]
 pub enum Expr {
     Atom(AtomVal),
     List(Vec<Box<Expr>>)
 }
 
-#[deriving(Eq, Show, Clone)]
+#[deriving(PartialEq, Show, Clone)]
 pub enum AtomVal {
     Symbol(String),
     Integer(BigInt),
@@ -48,7 +48,7 @@ impl LambdaVal {
     }
 }
 
-impl Eq for LambdaVal {
+impl PartialEq for LambdaVal {
     // Our custom eq allows numbers which are near each other to be equal! :D
     fn eq(&self, other: &LambdaVal) -> bool {
         match self {

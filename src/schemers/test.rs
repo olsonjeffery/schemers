@@ -220,7 +220,7 @@ mod eval_tests {
 
     #[test]
     #[should_fail]
-    fn given_a_symbol_NOT_in_the_env_then_calling_eval_should_fail() {
+    fn given_a_symbol_not_in_the_env_then_calling_eval_should_fail() {
         let env = Env::new(None, None, None);
         test_eval!("x".to_string(), env);
     }
@@ -360,7 +360,7 @@ mod eval_tests {
     }
 
     #[test]
-    fn set_should_return_a_None_for_the_out_expr() {
+    fn set_should_return_a_none_for_the_out_expr() {
         let env = Env::new(
             Some(vec!("x".to_string())), Some(vec!(Atom(Number::integer(42)))),
             None);
@@ -378,7 +378,7 @@ mod eval_tests {
     }
 
     #[test]
-    fn an_if_test_that_returns_a_None_out_expr_should_run_the_conseq_branch() {
+    fn an_if_test_that_returns_a_none_out_expr_should_run_the_conseq_branch() {
         let env = Env::new(
             Some(vec!("x".to_string())), Some(vec!(Atom(Number::integer(42)))),
             None);
@@ -389,12 +389,12 @@ mod eval_tests {
     }
 
     #[test]
-    fn should_be_able_to_create_an_env_with_all_None_params() {
+    fn should_be_able_to_create_an_env_with_all_none_params() {
         Env::new(None, None, None);
     }
 
     #[test]
-    fn evaling_a_define_should_return_None() {
+    fn evaling_a_define_should_return_none() {
         let env = Env::new(None, None, None);
         let in_expr = read("(define x 123)".to_string()).unwrap();
         let (result, _) = eval(in_expr, env);
@@ -530,7 +530,7 @@ mod eval_tests {
         }
     }
     #[test]
-    fn can_define_a_var_with_the_same_name_as_a_special_form_keyword_but_SF_is_still_usable() {
+    fn can_define_a_var_with_the_same_name_as_a_special_form_keyword_but_sf_is_still_usable() {
         let env = Env::new(None, None, None);
         let in_expr = read("(begin (define set! 42) (set! set! 37) set!)".to_string()).unwrap();
         let (out_expr, _) = eval(in_expr, env);
