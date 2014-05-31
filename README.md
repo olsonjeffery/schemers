@@ -10,7 +10,6 @@ In no particular order:
 
 #### Cleanup/completeness
 
-* Port to a newer version of Rust
 * Work on the actual API:
   * It is quite hideous right now, with `fail!`s all over the place
   * Should replace with `Result`-based API (would definitely ease error-reporting centralization, as well as improving overall grossness)
