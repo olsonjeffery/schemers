@@ -1,5 +1,7 @@
 # scheme.rs -- A toy Scheme implementation in Rust
 
+![travis-ci.org](https://travis-ci.org/olsonjeffery/schemers.svg?branch=master)
+
 This repository houses a self-contained implementation of Peter Norvig's [first essay on a simple Scheme implementation in Python][Norvig1] (but in Rust, of course). It is not particularly well-factored or optimized, but <s>was</s> is meant as a learning exercise in interpreter implementation. In this regard, it continues to be instructive.
 
 The codebase is well tested, with many examples demonstrating the use of all of the constructs contained herein.
