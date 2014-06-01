@@ -17,6 +17,7 @@ pub mod parse;
 pub mod expr;
 pub mod env;
 pub mod builtins;
+pub mod result;
 #[cfg(test)]
 mod test;
 
@@ -31,7 +32,7 @@ fn main() {
         .fold("".to_string(), |memo, arg| memo.append(arg.as_slice())
               .append(" ".as_slice())).as_slice()
         .trim().to_string();
-    let env = builtins::add_builtins(env::Env::new(None, None, None));
+    let env = builtins::add_builtins(env::Env::new_empty());
     let expr = match parse::read(program) {
         Ok(expr) => expr,
         Err(err) => fail!("ERROR: {}", err)

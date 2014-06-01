@@ -6,7 +6,11 @@
 // except according to those terms.
 
 use collections::hashmap::HashMap;
-use expr::Expr;
+use expr::{Expr, ExprResult};
+use result::SchemerResult;
+
+pub type EnvResult = SchemerResult<Env>;
+pub type EnvSetResult = SchemerResult<()>;
 
 pub struct Env {
     entries: HashMap<String, Expr>,
@@ -14,14 +18,26 @@ pub struct Env {
 }
 
 impl Env {
+    pub fn new_empty() -> Env {
+        Env {
+            entries: HashMap::new(),
+            outer: None
+        }
+    }
     pub fn new(
         params: Option<Vec<String>>,
         args: Option<Vec<Expr>>,
-        outer: Option<Env>) -> Env {
+        outer: Option<Env>) -> EnvResult {
         let mut entries = HashMap::new();
         if params.is_some() && args.is_some() {
-            let params = params.expect("params should be a value");
-            let args = args.expect("args should be a value");
+            let params = match params {
+                Some(p) => p,
+                None => return Err("Env::new(): params should be a value".to_string())
+            };
+            let args = match args {
+                Some(p) => p,
+                None => return Err("Env::new(): args should be a value".to_string())
+            };
             if params.len() == args.len() {
                 for ctr in range(0,params.len()) {
                     let var_name = params.get(ctr).to_string();
@@ -29,26 +45,31 @@ impl Env {
                     entries.insert(var_name, arg);
                 }
             } else {
-                fail!("params and args length doesn't match")
+                return Err("Env::new(): params and args length doesn't match".to_string())
             }
         }
         else if params.is_none() && args.is_none() {
-            // do nothing!
+            if outer.is_none() {
+                return Ok(Env::new_empty())
+            }
         } else {
-            fail!("cannot have params & args unset")
+            return Err("Env::new(): cannot have params & args unset".to_string())
         }
-        Env { entries: entries, outer: match outer { Some(e) => Some(box e), None => None } }
+        Ok(Env { entries: entries, outer: match outer { Some(e) => Some(box e), None => None } })
     }
 
-    pub fn set(&mut self, symbol: String, val: Expr) {
+    pub fn set(&mut self, symbol: String, val: Expr) -> EnvSetResult {
         match self.entries.contains_key(&symbol) {
             true => {
                 self.define(symbol, val);
+                Ok(())
             },
             false => match self.outer {
-                Some(ref mut outer_env) => outer_env.set(symbol, val),
-                None => fail!("Symbol '{}' is not defined in this Env scope chain",
-                              symbol)
+                Some(ref mut outer_env) =>
+                    outer_env.set(symbol, val),
+                None => Err(
+                    format!("Env.set(): Symbol '{}' is not defined in this Env scope chain",
+                            symbol))
             }
         }
     }
@@ -57,23 +78,20 @@ impl Env {
         self.entries.insert(symbol, val);
     }
 
-    pub fn find<'b>(&'b self, symbol: &String) -> Expr {
+    pub fn find<'b>(&'b self, symbol: &String) -> ExprResult {
         match self.entries.find(symbol) {
-            Some(v) => v.clone(),
+            Some(v) => Ok(v.clone()),
             None => {
                 match &self.outer {
                     &Some(ref outer_env) => outer_env.find(symbol),
-                    &None => fail!("No variable named {} defined in the environment."
-                                   , *symbol)
+                    &None => Err(format!("No variable named {} defined in the environment."
+                                   , *symbol))
                 }
             }
         }
     }
 
-    pub fn unwrap_parent(self) -> Env {
-        match self.outer {
-            Some(p) => *p,
-            None => fail!("env.unwrap_parent(): tried to unwrap when there's no parent env")
-        }
+    pub fn into_parent(self) -> Option<Env> {
+        self.outer.map(|x| *x)
     }
 }

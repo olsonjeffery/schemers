@@ -12,7 +12,10 @@ pub fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
     match expr {
         // Atom values and values in the Env
         Atom(Symbol(ref var_name)) => {
-            let out_val = env.find(var_name);
+            let out_val = match env.find(var_name) {
+                Ok(expr) => expr,
+                Err(err) => fail!("eval: failure to resolve symbol: {}", err)
+            };
             (Some(out_val.clone()), env)
         },
         val @ Atom(_) => (Some(val), env),
@@ -44,9 +47,12 @@ pub fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                                     let (val_expr, mut env) =
                                         eval(*items.pop()
                                              .expect("eval: set! val not provided"), env);
-                                    env.set(name,
+                                    match env.set(name,
                                         val_expr.expect(
-                                            "eval: set!: provided val didn't resolve"));
+                                            "eval: set!: provided val didn't resolve")) {
+                                        Err(err) => fail!("eval: set! err: {}", err),
+                                        _ => {}
+                                    };
                                     (None, env)
                                 },
                                 _ => fail!("eval: set!: atom in var name position must be symbol")
@@ -66,16 +72,27 @@ pub fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                 },
                 // oh boy a procedure call!
                 Atom(Symbol(proc_name)) => {
-                    let target_proc = env.find(&proc_name);
+                    let target_proc = match env.find(&proc_name) {
+                        Ok(expr) => expr,
+                        Err(err) => fail!("eval: failure to resolve symbol: {}", err)
+                    };
                     match target_proc {
                         Atom(Lambda(UserDefined(_, vars, body))) => {
                             match cdr {
                                 args @ List(_) => {
                                     let (args, env) = args.unbox_and_eval(env);
-                                    let new_env = Env::new(Some(vars),
-                                                           Some(args), Some(env));
+                                    let new_env = match Env::new(Some(vars),
+                                                           Some(args), Some(env)) {
+                                        Ok(env) => env,
+                                        Err(e) =>
+                                            fail!("eval(): failure to nest env: {}", e)
+                                    };
                                     let (out_expr, new_env) = eval(*body, new_env);
-                                    (out_expr, new_env.unwrap_parent())
+                                    let parent = match new_env.into_parent() {
+                                        Some(env) => env,
+                                        None => fail!("eval: failed to get/unwrap parent env")
+                                    };
+                                    (out_expr, parent)
                                 },
                                 _ => fail!("eval: proc invoke: should've gotten a list in the cdr")
                             }

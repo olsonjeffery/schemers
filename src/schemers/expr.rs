@@ -13,6 +13,9 @@ use num::bigint::BigInt;
 
 use env::Env;
 use eval::eval;
+use result::SchemerResult;
+
+pub type ExprResult = SchemerResult<Expr>;
 
 #[deriving(PartialEq, Show, Clone)]
 pub enum Expr {

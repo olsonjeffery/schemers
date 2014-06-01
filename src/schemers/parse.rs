@@ -5,10 +5,9 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use expr::{Expr, List};
-pub type ReadResult = Result<Expr, String>;
+use expr::{Expr, List, ExprResult};
 
-pub fn read(input: String) -> ReadResult {
+pub fn read(input: String) -> ExprResult {
     parse(&mut tokenize(input))
 }
 
@@ -26,7 +25,7 @@ pub fn tokenize(input: String) -> Vec<String> {
         .filter(|i| *i != "".as_slice()).map(|i| i.to_string()).collect()
 }
 
-pub fn parse(tokens: &mut Vec<String>) -> ReadResult {
+pub fn parse(tokens: &mut Vec<String>) -> ExprResult {
     let current_token = match tokens.shift() {
         Some(t) => t,
         None => return Err("parse: calling w/ empty token list; shouldn't happen".to_string())
