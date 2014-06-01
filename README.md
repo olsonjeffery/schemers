@@ -6,28 +6,33 @@ This repository houses a self-contained implementation of Peter Norvig's [first 
 
 The codebase is well tested, with many examples demonstrating the use of all of the constructs contained herein.
 
-## TODO List
+## Upcoming Work
 
-In no particular order:
-
-#### Cleanup/completeness
-
-* Work on the actual API:
-  * It is quite hideous right now, with `fail!`s all over the place
-  * Should replace with `Result`-based API (would definitely ease error-reporting centralization, as well as improving overall grossness)
-  * The current implementation is heavily entrenched in pass-by-value semantics; it'd be real swell to get the desired behavior with a lot more use of references, slices, etc (I fell-back to by-val after hitting several walls w/ referenced-based approaches)
-* Implement a proper REPL
+* Replace all uses of `fail!()`, `unwrap()` and `expect()` with a `Result`-based API, by module:
+  * <s>`env`</s>
+  * `eval`
+  * <s>`parse`</s>
+  * `expr`
+  * `builtins`
+* `lambda` is currently non-spec because it doesn't store/capture the surrounding `Env` (this use case isn't capture in the first essay's test suite); Is simple to implement, but perf will be ugly because of all the `Env` copying
+* TCO
+* Some benchmarks:
+  * `fact(1000)` (can't be done before TCO lands)
+  * Some kind of `Env`-copy/`lambda`-centric benchmark to get data before working on `Env`/`Expr`-passing refactor below
+* Move away from by-val `Expr` passing for *everything* in the API.
+  * `Env` will store just `Rc<Expr>`, instead of `Expr`
+  * `eval` will take `Rc<Expr>`s, as well as all of the helpers that fall out from it
+  * In this way, the boxing is bottlenecked to boundary between `read` and `eval`
+  * Probably has test fallout (can capture w/i `test_eval!`?
 * __API Documentation__
-
-#### Feature Work
-
-* Tackle the contents Peter Norvig's [second essay on the same topic][Norvig2], notably:
+* Tackle the (remaining) contents Peter Norvig's [second essay on the same topic][Norvig2], notably:
   * More `Atom` types (strings, <s>bools</s>, complex numbers, etc)
-  * Macros
-  * TCO
+  * Hygenic Macros
   * Better error detection/parsing
   * Expanded list of primitive procedures
   * The expanded test suite (would probably just adapt `lispytest.py` for this)
+* Implement a proper REPL
 
 [Norvig1]: http://norvig.com/lispy.html "(How to Write a (Lisp) Interpreter (in Python))"
 [Norvig2]: http://norvig.com/lispy2.html "(An ((Even Better) Lisp) Interpreter (in Python))"
+
