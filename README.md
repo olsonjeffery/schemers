@@ -24,7 +24,8 @@ The codebase is well tested, with many examples demonstrating the use of all of 
   * `Env` will store just `Rc<Expr>`, instead of `Expr`
   * `eval` will take `Rc<Expr>`s, as well as all of the helpers that fall out from it
   * In this way, the boxing is bottlenecked to boundary between `read` and `eval`
-  * Probably has test fallout (can capture w/i `test_eval!`?
+  * Not worried about ensuring that there's only one instance of a given `Expr` value in all of the `Env`s; just that there's a net decrease `in Expr` value copies
+  * Probably has test fallout (can capture w/i `test_eval!`?)
 * __API Documentation__
 * `result::SchemerResult` should change its `Err` component from `String` to take a new `SchemerError` value
   * `SchemerError` contains the module/type/method/function path of the `Err`-ing code (wish this could be handled in a macro), along with the `String` error component

@@ -91,7 +91,7 @@ impl Show for LambdaVal {
 }
 
 impl Expr {
-    pub fn new_atom(input: String) -> Expr {
+    pub fn new_atom(input: String) -> ExprResult {
         let first_char = input.as_slice().char_at(0);
         match first_char {
             '0' | '1' | '2' | '3' | '4' | '5' |
@@ -101,14 +101,16 @@ impl Expr {
                         let parsed_val: Option<f64>
                             = FromStr::from_str(input.as_slice());
                         match parsed_val {
-                            Some(val) => Atom(Number::float(val)),
-                            None => fail!("Cannot parse number-like input of: '{}'", input)
+                            Some(val) => Ok(Atom(Number::float(val))),
+                            None => Err(format!("Cannot parse number-like input of: '{}'",
+                                                input))
                         }
                     },
                     false => {
                         match FromStr::from_str(input.as_slice()) {
-                            Some(val) => Atom(Integer(val)),
-                            None => fail!("Cannot parse number-like input of: {}", input)
+                            Some(val) => Ok(Atom(Integer(val))),
+                            None => Err(format!("Cannot parse number-like input of: {}",
+                                                input))
                         }
                     }
                 }
@@ -116,14 +118,14 @@ impl Expr {
             '#' => {
                 // #-prefix parsing
                 match &input {
-                    v if *v == "#f".to_string() => Atom(Boolean(false)),
-                    v if *v == "#false".to_string() => Atom(Boolean(false)),
-                    v if *v == "#t".to_string() => Atom(Boolean(true)),
-                    v if *v == "#true".to_string() => Atom(Boolean(true)),
-                    _ => fail!("un-implemented case of #-prefixing")
+                    v if *v == "#f".to_string() => Ok(Atom(Boolean(false))),
+                    v if *v == "#false".to_string() => Ok(Atom(Boolean(false))),
+                    v if *v == "#t".to_string() => Ok(Atom(Boolean(true))),
+                    v if *v == "#true".to_string() => Ok(Atom(Boolean(true))),
+                    _ => Err(format!("un-implemented case of sharp/pound-prefixing"))
                 }
             }
-            _ => Atom(Symbol(input))
+            _ => Ok(Atom(Symbol(input)))
         }
     }
 

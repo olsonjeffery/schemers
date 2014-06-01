@@ -44,6 +44,6 @@ pub fn parse(tokens: &mut Vec<String>) -> ExprResult {
         },
         ref x if *x == ")".to_string() =>
             Err("hit ) token; shouldn't happen".to_string()),
-        x => Ok(Expr::new_atom(x))
+        x => Expr::new_atom(x)
     }
 }
