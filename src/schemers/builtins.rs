@@ -444,7 +444,11 @@ fn builtin_cons(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     if args.len() != 2 {
         fail!("cons: expects two parameters")
     }
-    (Some(Expr::cons(args.shift().unwrap(), args.shift().unwrap())), env)
+    let cons_result = match Expr::cons(args.shift().unwrap(), args.shift().unwrap()) {
+        Ok(r) => r,
+        Err(e) => fail!("builtin_cons: failure in Expr::cons(): {}", e)
+    };
+    (Some(cons_result), env)
 }
 fn builtin_car(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     if args.len() != 1 {

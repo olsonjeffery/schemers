@@ -16,6 +16,7 @@ use eval::eval;
 use result::SchemerResult;
 
 pub type ExprResult = SchemerResult<Expr>;
+pub type UnboxAndEvalResult = SchemerResult<(Vec<Expr>, Env)>;
 
 #[deriving(PartialEq, Show, Clone)]
 pub enum Expr {
@@ -129,7 +130,7 @@ impl Expr {
         }
     }
 
-    pub fn cons(car: Expr, cdr: Expr) -> Expr {
+    pub fn cons(car: Expr, cdr: Expr) -> ExprResult {
         let mut new_items = vec!(box car);
         match cdr {
             v @ Atom(_) => new_items.push(box v),
@@ -137,7 +138,7 @@ impl Expr {
                 new_items.push(i);
             }
         }
-        List(new_items)
+        Ok(List(new_items))
     }
 
     pub fn print(&self) -> String {
@@ -181,7 +182,7 @@ impl Expr {
 
     // fns for consuming/breaking down Exprs into composed elements
     // or underlying values
-    pub fn unbox_and_eval(self, env: Env) -> (Vec<Expr>, Env) {
+    pub fn unbox_and_eval(self, env: Env) -> UnboxAndEvalResult {
         match self {
             List(items) => {
                 let args: Vec<Expr> = items.move_iter().map(|x| *x).collect();
@@ -195,9 +196,9 @@ impl Expr {
                     env = out_env;
                     evald_args.push(evald_arg);
                 }
-                (evald_args, env)
+                Ok((evald_args, env))
             },
-            _ => fail!("calling unbox on non-List expr")
+            _ => Err(format!("calling unbox on non-List expr"))
         }
     }
     pub fn unwrap_float(self) -> BigRational {

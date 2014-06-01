@@ -74,13 +74,17 @@ pub fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                 Atom(Symbol(proc_name)) => {
                     let target_proc = match env.find(&proc_name) {
                         Ok(expr) => expr,
-                        Err(err) => fail!("eval: failure to resolve symbol: {}", err)
+                        Err(err) =>
+                            fail!("eval: failure to resolve symbol: {}", err)
                     };
                     match target_proc {
                         Atom(Lambda(UserDefined(_, vars, body))) => {
                             match cdr {
                                 args @ List(_) => {
-                                    let (args, env) = args.unbox_and_eval(env);
+                                    let (args, env) = match args.unbox_and_eval(env) {
+                                        Ok(r) => r,
+                                        Err(e) => fail!("eval(): unbox failure: {}", e)
+                                    };
                                     let new_env = match Env::new(Some(vars),
                                                            Some(args), Some(env)) {
                                         Ok(env) => env,
@@ -100,7 +104,10 @@ pub fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                         Atom(Lambda(BuiltIn(_, _body_fn))) => {
                             match cdr {
                                 list @ List(_) => {
-                                    let (args, env) = list.unbox_and_eval(env);
+                                    let (args, env) = match list.unbox_and_eval(env) {
+                                        Ok(r) => r,
+                                        Err(e) => fail!("eval(): failure in unbox: {}", e)
+                                    };
                                     _body_fn(args, env)
                                 },
                                 _ => fail!("expected cdr to be List(...)")
