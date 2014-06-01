@@ -26,6 +26,10 @@ The codebase is well tested, with many examples demonstrating the use of all of 
   * In this way, the boxing is bottlenecked to boundary between `read` and `eval`
   * Probably has test fallout (can capture w/i `test_eval!`?
 * __API Documentation__
+* `result::SchemerResult` should change its `Err` component from `String` to take a new `SchemerError` value
+  * `SchemerError` contains the module/type/method/function path of the `Err`-ing code (wish this could be handled in a macro), along with the `String` error component
+  * This enables a more uniform error display in the REPL/elsewhere
+  * Generating the `Err` variant of `SchemerError` can be handled in a macro, and all makers of `SchemerResult` will be caught up in this change
 * Tackle the (remaining) contents Peter Norvig's [second essay on the same topic][Norvig2], notably:
   * More `Atom` types (strings, <s>bools</s>, complex numbers, etc)
   * Hygenic Macros
