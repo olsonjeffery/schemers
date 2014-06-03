@@ -455,7 +455,10 @@ fn builtin_car(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
         fail!("car: expect a single list parameter");
     }
     let (car, _) = match args.pop().unwrap() {
-        v @ List(_) => v.un_cons(),
+        v @ List(_) => match v.un_cons() {
+            Ok(v) => v,
+            Err(e) => fail!("car: {}", e)
+        },
         _ => fail!("car: expected a list")
     };
     (Some(car), env)
@@ -465,7 +468,10 @@ fn builtin_cdr(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
         fail!("cdr: expect a single list parameter");
     }
     let (_, cdr) = match args.pop().unwrap() {
-        v @ List(_) => v.un_cons(),
+        v @ List(_) => match v.un_cons() {
+            Ok(v) => v,
+            Err(e) => fail!("cdr: {}", e)
+        },
         _ => fail!("cdr: expected a list")
     };
     (Some(cdr), env)

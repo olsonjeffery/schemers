@@ -23,7 +23,10 @@ pub fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
             if list.is_null() {
                 return (Some(list), env);
             }
-            let (car, cdr) = list.un_cons();
+            let (car, cdr) = match list.un_cons() {
+                Ok(v) => v,
+                Err(e) => fail!("eval(): un_cons() failed: {}", e)
+            };
             match car {
                 Atom(ref val) if *val == Symbol("quote".to_string())  => {
                     match cdr {
@@ -134,7 +137,10 @@ fn eval_define(cdr: Expr, env: Env) -> Env {
                             if val_expr.is_atom() {
                                 eval(val_expr , env)
                             } else {
-                                let (car, cdr) = val_expr.clone().un_cons();
+                                let (car, cdr) = match val_expr.clone().un_cons() {
+                                    Ok(v) => v,
+                                    Err(e) => fail!("eval_define(): un_cons failed: {}", e)
+                                };
                                 match car {
                                     Atom(ref val) if *val == Symbol("lambda".to_string()) => {
                                         (eval_lambda(name.to_string(), cdr), env)

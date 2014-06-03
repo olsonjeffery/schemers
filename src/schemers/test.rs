@@ -173,13 +173,19 @@ mod eval_tests {
     #[test]
     fn an_atom_expr_returns_the_atom_in_the_car_with_none_in_the_cdr() {
         let expr = read("x".to_string()).unwrap();
-        expr.un_cons();
+        let (_, _)  = match expr.un_cons() {
+            Ok((car, cdr)) => (car, cdr),
+            Err(e) => fail!("{}", e),
+        };
     }
 
     #[test]
     fn a_list_with_one_atom_element_returns_an_atom_car_and_an_empty_list_in_the_cdr() {
         let expr = read("(x)".to_string()).unwrap();
-        let (car, cdr) = expr.un_cons();
+        let (car, cdr)  = match expr.un_cons() {
+            Ok((car, cdr)) => (car, cdr),
+            Err(e) => fail!("{}", e),
+        };
         assert_eq!(car, Atom(Symbol("x".to_string())));
         match cdr {
             List(items) => assert_eq!(items.len(), 0),
@@ -190,7 +196,10 @@ mod eval_tests {
     #[test]
     fn a_list_with_multiple_elems_puts_the_first_the_car_and_the_rest_in_the_cdr() {
         let expr = read("(y 2 3)".to_string()).unwrap();
-        let (car, cdr) = expr.un_cons();
+        let (car, cdr)  = match expr.un_cons() {
+            Ok((car, cdr)) => (car, cdr),
+            Err(e) => fail!("{}", e),
+        };
         assert_eq!(car, Atom(Symbol("y".to_string())));
         match cdr {
             List(items) => {
@@ -204,7 +213,10 @@ mod eval_tests {
     #[should_fail]
     fn calling_un_cons_on_an_empty_list_should_fail() {
         let expr = read("()".to_string()).unwrap();
-        expr.un_cons();
+        let (_, _)  = match expr.un_cons() {
+            Ok((car, cdr)) => (car, cdr),
+            Err(e) => fail!("{}", e),
+        };
     }
 
     #[test]

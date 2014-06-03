@@ -17,6 +17,7 @@ use result::SchemerResult;
 
 pub type ExprResult = SchemerResult<Expr>;
 pub type UnboxAndEvalResult = SchemerResult<(Vec<Expr>, Env)>;
+pub type UnConsResult = SchemerResult<(Expr, Expr)>;
 
 #[deriving(PartialEq, Show, Clone)]
 pub enum Expr {
@@ -151,16 +152,21 @@ impl Expr {
             &Atom(ref v) => v.print()
         }
     }
-    pub fn un_cons(self) -> (Expr, Expr) {
+    pub fn un_cons(self) -> UnConsResult {
         match self {
-            Atom(_) => fail!("Cannot un_cons an Atom value"),
+            Atom(_) => return Err("expr.un_cons(): Cannot un_cons an Atom value"
+                                  .to_string()),
             List(mut items) => {
                 if items.len() == 0 {
-                    fail!("cannot build car/cdr of empty list");
+                    return Err("expr.un_cons(): cannot build car/cdr of empty list"
+                               .to_string());
                 }
-                let car = items.shift()
-                    .expect("at least one item in the least; shouldn't happen");
-                (*car, List(items))
+                let car = match items.shift() {
+                    Some(v) => v,
+                    None => return Err("expr.un_cons(): items collection empty; \
+                        shouldn't happen".to_string())
+                };
+                Ok((*car, List(items)))
             }
         }
     }
@@ -190,9 +196,10 @@ impl Expr {
                 let mut evald_args = Vec::new();
                 for i in args.move_iter() {
                     let (evald_arg, out_env) = eval(i, env);
-                    let evald_arg =
-                        evald_arg
-                        .expect("eval'd arg should ret expr");
+                    let evald_arg = match evald_arg {
+                        Some(v) => v,
+                        _ => return Err("eval'd arg should ret expr".to_string())
+                    };
                     env = out_env;
                     evald_args.push(evald_arg);
                 }
