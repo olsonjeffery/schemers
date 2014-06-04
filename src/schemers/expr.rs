@@ -38,6 +38,7 @@ pub enum AtomVal {
 pub enum LambdaVal {
     UserDefined(String, Vec<String>, Box<Expr>),
     BuiltIn(String, fn(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env))
+    //BuiltIn(String, fn(args: Vec<Expr>, env: Env) -> SchemerResult<(Option<Expr>, Env)>)
 }
 
 impl LambdaVal {
@@ -212,14 +213,14 @@ impl Expr {
         match self {
             Atom(Integer(v)) => Ok(Ratio::new(v, One::one())),
             Atom(Float(v)) => Ok(v),
-            _ => Err("calling unwrap_float() on non-numeric value")
+            _ => Err("calling unwrap_float() on non-numeric value".to_string())
         }
     }
     pub fn into_integer(self) -> SchemerResult<BigInt> {
         match self {
             Atom(Float(v)) => Ok(v.numer().clone()),
             Atom(Integer(v)) => Ok(v),
-            _ => Err("calling unwrap_integer() on non-numeric value")
+            _ => Err("calling unwrap_integer() on non-numeric value".to_string())
         }
     }
 }
