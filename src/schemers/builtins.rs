@@ -217,134 +217,12 @@ fn builtin_divide(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     (Some(out_val), env)
 }
 
-fn builtin_lt(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
-    let mut hasFloats = false;
-    if args.len() < 2 {
-        fail!("<: too few parameters (must provide at least two)");
-    }
-    for atom in args.iter() {
-        match atom {
-            &Atom(Float(_)) => hasFloats = true,
-            &Atom(Integer(_)) => {},
-            val => fail!("less-than: invoking with non numeric input: '{}'", val.print())
-        }
-    }
-    let out_val = if hasFloats {
-        let mut state = false;
-        let mut left = match args.shift()
-            .expect("head of less-than args should be Some()") {
-                left @ Atom(Integer(_)) |
-                left @ Atom(Float(_)) => left.into_float().unwrap(),
-                _ => fail!("less-than: cannot process non-numeric input")
-            };
-        for atom in args.move_iter() {
-            match atom {
-                right @ Atom(Integer(_)) | right @ Atom(Float(_)) => {
-                    let right = right.into_float().unwrap();
-                    state = left < right;
-                    left = right;
-                },
-                _ => fail!("less-than: invoking with non numeric input")
-            }
-        }
-        Atom(Boolean(state))
-    } else {
-        let mut state = false;
-        let mut left = match args.shift()
-            .expect("head of less-than args should be Some()") {
-                left @ Atom(Integer(_))
-                | left @ Atom(Float(_)) => match left.into_integer() {
-                    Ok(v) => v,
-                    Err(e) => fail!("{}", e)
-                },
-                _ => fail!("less-than: cannot process non-numeric input")
-            };
-        for atom in args.move_iter() {
-            match atom {
-                Atom(Integer(right)) => {
-                    state = left < right;
-                    left = right;
-                }
-                _ => fail!("less-than: invoking with non numeric input")
-            }
-        }
-        Atom(Boolean(state))
-    };
-    (Some(out_val), env)
-}
-
-fn builtin_gt(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
-    let mut hasFloats = false;
-    if args.len() < 2 {
-        fail!("<: too few parameters (must provide at least two)");
-    }
-    for atom in args.iter() {
-        match atom {
-            &Atom(Float(_)) => hasFloats = true,
-            &Atom(Integer(_)) => {},
-            val => fail!("greater-than: invoking with non numeric input: '{}'", val.print())
-        }
-    }
-    let out_val = if hasFloats {
-        let mut state = false;
-        let mut left = match args.shift()
-            .expect("head of greater-than args should be Some()") {
-                left @ Atom(Integer(_))
-                | left @ Atom(Float(_)) => match left.into_float() {
-                    Ok(v) => v,
-                    Err(e) => fail!("{}", e)
-                },
-                _ => fail!("greater-than: cannot process non-numeric input")
-            };
-        for atom in args.move_iter() {
-            match atom {
-                right @ Atom(Integer(_)) | right @ Atom(Float(_)) => {
-                    let right = match right.into_float() {
-                        Ok(v) => v,
-                        Err(e) => fail!("{}", e)
-                    };
-                    state = left > right;
-                    left = right;
-                },
-                _ => fail!("greater-than: invoking with non numeric input")
-            }
-        }
-        Atom(Boolean(state))
-    } else {
-        let mut state = false;
-        let mut left = match args.shift()
-            .expect("head of greater-than args should be Some()") {
-                left @ Atom(Integer(_))
-                | left @ Atom(Float(_)) => match left.into_integer() {
-                    Ok(v) => v,
-                    Err(e) => fail!("{}", e)
-                },
-                _ => fail!("greater-than: cannot process non-numeric input")
-            };
-        for atom in args.move_iter() {
-            match atom {
-                Atom(Integer(right)) => {
-                    state = left > right;
-                    left = right;
-                }
-                _ => fail!("greater-than: invoking with non numeric input")
-            }
-        }
-        Atom(Boolean(state))
-    };
-    (Some(out_val), env)
-}
-
-fn builtin_lte(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
-    match builtin_lte_new(args, env) {
-        Ok(r) => r,
-        Err(e) => fail!("{}", e)
-    }
-}
-fn builtin_lte_new(mut args: Vec<Expr>, env: Env) -> SchemerResult<(Option<Expr>, Env)> {
-    let name = "<=";
-    let transformer_bi = |left:BigInt, right:BigInt| left <= right;
-    let transformer_br = |left:BigRational, right:BigRational| left <= right;
+fn builtin_predicate_compare(mut args: Vec<Expr>,
+                   env: Env,
+                   name: &str,
+                   transformer_bi: |BigInt, BigInt| -> bool,
+                   transformer_br: |BigRational, BigRational| -> bool,
+                   ) -> SchemerResult<(Option<Expr>, Env)> {
     let mut hasFloats = false;
     if args.len() < 2 {
         return Err(format!("{}: too few parameters (must provide at least two)", name));
@@ -402,67 +280,50 @@ fn builtin_lte_new(mut args: Vec<Expr>, env: Env) -> SchemerResult<(Option<Expr>
     Ok((Some(out_val), env))
 }
 
-fn builtin_gte(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
-    let mut hasFloats = false;
-    if args.len() < 2 {
-        fail!("<: too few parameters (must provide at least two)");
+fn builtin_lt(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    let name = "<";
+    let transformer_bi = |left:BigInt, right:BigInt| left < right;
+    let transformer_br = |left:BigRational, right:BigRational| left < right;
+    match builtin_predicate_compare(args, env, name, transformer_bi,
+                          transformer_br) {
+        Ok(r) => r,
+        Err(e) => fail!("{}", e)
     }
-    for atom in args.iter() {
-        match atom {
-            &Atom(Float(_)) => hasFloats = true,
-            &Atom(Integer(_)) => {},
-            val => fail!("greater-than: invoking with non numeric input: '{}'", val.print())
-        }
-    }
-    let out_val = if hasFloats {
-        let mut state = false;
-        let mut left = match args.shift()
-            .expect("head of greater-than args should be Some()") {
-                left @ Atom(Integer(_)) |
-                left @ Atom(Float(_)) => match left.into_float() {
-                        Ok(v) => v,
-                        Err(e) => fail!(format!("{}", e))
-                    },
-                _ => fail!("greater-than: cannot process non-numeric input")
-            };
-        for atom in args.move_iter() {
-            match atom {
-                right @ Atom(Integer(_)) | right @ Atom(Float(_)) => {
-                    let right = match right.into_float() {
-                        Ok(v) => v,
-                        Err(e) => fail!("{}", e)
-                    };
-                    state = left >= right;
-                    left = right;
-                },
-                _ => fail!("greater-than: invoking with non numeric input")
-            }
-        }
-        Atom(Boolean(state))
-    } else {
-        let mut state = false;
-        let mut left = match args.shift()
-            .expect("head of greater-than args should be Some()") {
-                left @ Atom(Integer(_))
-                    | left @ Atom(Float(_)) => match left.into_integer() {
-                            Ok(v) => v,
-                            Err(e) => fail!(format!("{}", e))
-                        },
-                _ => fail!("greater-than: cannot process non-numeric input")
-            };
-        for atom in args.move_iter() {
-            match atom {
-                Atom(Integer(right)) => {
-                    state = left >= right;
-                    left = right;
-                }
-                _ => fail!("greater-than: invoking with non numeric input")
-            }
-        }
-        Atom(Boolean(state))
-    };
-    (Some(out_val), env)
 }
+
+fn builtin_gt(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    let name = ">";
+    let transformer_bi = |left:BigInt, right:BigInt| left > right;
+    let transformer_br = |left:BigRational, right:BigRational| left > right;
+    match builtin_predicate_compare(args, env, name, transformer_bi,
+                          transformer_br) {
+        Ok(r) => r,
+        Err(e) => fail!("{}", e)
+    }
+}
+
+fn builtin_lte(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    let name = "<=";
+    let transformer_bi = |left:BigInt, right:BigInt| left <= right;
+    let transformer_br = |left:BigRational, right:BigRational| left <= right;
+    match builtin_predicate_compare(args, env, name, transformer_bi,
+                          transformer_br) {
+        Ok(r) => r,
+        Err(e) => fail!("{}", e)
+    }
+}
+
+fn builtin_gte(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    let name = ">=";
+    let transformer_bi = |left:BigInt, right:BigInt| left >= right;
+    let transformer_br = |left:BigRational, right:BigRational| left >= right;
+    match builtin_predicate_compare(args, env, name, transformer_bi,
+                          transformer_br) {
+        Ok(r) => r,
+        Err(e) => fail!("{}", e)
+    }
+}
+
 fn builtin_not(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
     if args.len() != 1 {
         fail!("not: expect a single parameter")
