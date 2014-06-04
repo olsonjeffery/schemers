@@ -208,18 +208,18 @@ impl Expr {
             _ => Err(format!("calling unbox on non-List expr"))
         }
     }
-    pub fn unwrap_float(self) -> BigRational {
+    pub fn into_float(self) -> SchemerResult<BigRational> {
         match self {
-            Atom(Integer(v)) => Ratio::new(v, One::one()),
-            Atom(Float(v)) => v,
-            _ => fail!("calling unwrap_float() on non-numeric value")
+            Atom(Integer(v)) => Ok(Ratio::new(v, One::one())),
+            Atom(Float(v)) => Ok(v),
+            _ => Err("calling unwrap_float() on non-numeric value")
         }
     }
-    pub fn unwrap_integer(self) -> BigInt {
+    pub fn into_integer(self) -> SchemerResult<BigInt> {
         match self {
-            Atom(Float(v)) => v.numer().clone(),
-            Atom(Integer(v)) => v,
-            _ => fail!("calling unwrap_integer() on non-numeric value")
+            Atom(Float(v)) => Ok(v.numer().clone()),
+            Atom(Integer(v)) => Ok(v),
+            _ => Err("calling unwrap_integer() on non-numeric value")
         }
     }
 }
