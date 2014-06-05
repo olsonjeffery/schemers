@@ -64,7 +64,7 @@ fn builtin_arithmetic(mut args: Vec<Expr>, env: Env,
                     },
                     _ => return Err(format!("{}: cannot process non-numeric input", name))
                 },
-                None => return Err(format!("{}: head of add args should be Some()", name)) 
+                None => return Err(format!("{}: head of add args should be Some()", name))
             };
         for atom in args.move_iter() {
             match atom {
