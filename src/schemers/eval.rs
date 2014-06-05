@@ -111,7 +111,7 @@ pub fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                                         Ok(r) => r,
                                         Err(e) => fail!("eval(): failure in unbox: {}", e)
                                     };
-                                    _body_fn(args, env)
+                                    _body_fn(args, env).unwrap()
                                 },
                                 _ => fail!("expected cdr to be List(...)")
                             }

@@ -37,8 +37,7 @@ pub enum AtomVal {
 #[deriving(Clone)]
 pub enum LambdaVal {
     UserDefined(String, Vec<String>, Box<Expr>),
-    BuiltIn(String, fn(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env))
-    //BuiltIn(String, fn(args: Vec<Expr>, env: Env) -> SchemerResult<(Option<Expr>, Env)>)
+    BuiltIn(String, fn(args: Vec<Expr>, env: Env) -> SchemerResult<(Option<Expr>, Env)>)
 }
 
 impl LambdaVal {
