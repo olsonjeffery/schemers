@@ -39,32 +39,41 @@ pub fn add_builtins(mut env: Env) -> Env {
                Atom(Lambda(BuiltIn("display".to_string(), builtin_display))));
     env
 }
-fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+
+fn builtin_arithmetic(mut args: Vec<Expr>, env: Env,
+                      name: &str,
+                      transformer_bi: |BigInt, BigInt| -> BigInt,
+                      transformer_br: |BigRational, BigRational| -> BigRational,
+                      ) -> SchemerResult<(Option<Expr>, Env)> {
     let mut hasFloats = false;
     for atom in args.iter() {
         match atom {
             &Atom(Float(_)) => hasFloats = true,
             &Atom(Integer(_)) => {},
-            val => fail!("add: invoking with non numeric input: '{}'", val.print())
+            val => return Err(format!("{}: invoking with non numeric input: '{}'",
+                         name, val.print()))
         }
     }
     let out_val = if hasFloats {
         let mut out_val = match args.shift()
-            .expect("head of add args should be Some()") {
-                 v @ Atom(Integer(_)) | v @ Atom(Float(_)) => match v.into_float() {
-                     Ok(v) => v,
-                     Err(e) => fail!("{}", e)
-                 },
-                _ => fail!("add: cannot process non-numeric input")
+            {
+                Some(v) => match v {
+                    v @ Atom(Integer(_)) | v @ Atom(Float(_)) => match v.into_float() {
+                        Ok(v) => v,
+                        Err(e) => return Err(format!("{}: {}", name, e))
+                    },
+                    _ => return Err(format!("{}: cannot process non-numeric input", name))
+                },
+                None => return Err(format!("{}: head of add args should be Some()", name)) 
             };
         for atom in args.move_iter() {
             match atom {
                 v @ Atom(Integer(_)) | v @ Atom(Float(_)) =>
                     out_val = match v.into_float() {
-                        Ok(v) => v + out_val,
-                        Err(e) => fail!("{}", e)
+                        Ok(v) => transformer_br(out_val, v),
+                        Err(e) => return Err(format!("{}: {}", name, e))
                     },
-                _ => fail!("add: invoking with non numeric input")
+                _ => return Err(format!("{}: invoking with non numeric input", name))
             }
         }
         Atom(Float(out_val))
@@ -73,148 +82,59 @@ fn builtin_add(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
             .expect("head of add args should be Some()") {
                 v @ Atom(Integer(_)) | v @ Atom(Float(_)) => match v.into_integer() {
                     Ok(v) => v,
-                    Err(e) => fail!("{}", e)
+                    Err(e) => return Err(format!("{}", e))
                 },
-                _ => fail!("add: cannot process non-numeric input")
+                _ => return Err(format!("{}: cannot process non-numeric input", name))
             };
         for atom in args.move_iter() {
             match atom {
-                Atom(Integer(val)) => out_val = out_val + val,
-                _ => fail!("add: invoking with non numeric input")
+                Atom(Integer(val)) => out_val = transformer_bi(out_val, val),
+                _ => return Err(format!("{}: invoking with non numeric input", name))
             }
         }
         Atom(Integer(out_val))
     };
-    (Some(out_val), env)
+    Ok((Some(out_val), env))
 }
 
-fn builtin_subtract(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
-    let mut hasFloats = false;
-    for atom in args.iter() {
-        match atom {
-            &Atom(Float(_)) => hasFloats = true,
-            &Atom(Integer(_)) => {},
-            val => fail!("subtract: invoking with non numeric input: '{}'", val.print())
-        }
+fn builtin_add(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    let name = "+";
+    let transformer_bi = |left:BigInt, right: BigInt| left + right;
+    let transformer_br = |left:BigRational, right: BigRational| left + right;
+    match builtin_arithmetic(args, env, name, transformer_bi, transformer_br) {
+        Ok(v) => v,
+        Err(e) => fail!("{}: {}", name, e)
     }
-    let out_val = if hasFloats {
-        let mut out_val = match args.shift()
-            .expect("head of subtract args should be Some()") {
-                v @ Atom(Integer(_)) | v @ Atom(Float(_)) => match v.into_float() {
-                    Ok(v) => v,
-                    Err(e) => fail!("{}", e)
-                },
-                _ => fail!("subtract: cannot process non-numeric input")
-            };
-        for atom in args.move_iter() {
-            match atom {
-                v @ Atom(Integer(_)) | v @ Atom(Float(_)) =>
-                    out_val = out_val - match v.into_float() {
-                        Ok(v) => v,
-                        Err(e) => fail!("{}", e)
-                    },
-                _ => fail!("subtract: invoking with non numeric input")
-            }
-        }
-        Atom(Float(out_val))
-    } else {
-        let mut out_val = match args.shift()
-            .expect("head of subtract args should be Some()") {
-                v @ Atom(Integer(_)) | v @ Atom(Float(_)) => match v.into_integer() {
-                    Ok(v) => v,
-                    Err(e) => fail!("{}", e)
-                },
-                _ => fail!("subtract: cannot process non-numeric input")
-            };
-        for atom in args.move_iter() {
-            match atom {
-                Atom(Integer(val)) => out_val = out_val - val,
-                _ => fail!("subtract: invoking with non numeric input")
-            }
-        }
-        Atom(Integer(out_val))
-    };
-    (Some(out_val), env)
 }
 
-fn builtin_multiply(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
-    let mut hasFloats = false;
-    for atom in args.iter() {
-        match atom {
-            &Atom(Float(_)) => hasFloats = true,
-            &Atom(Integer(_)) => {},
-            val => fail!("multiply: invoking with non numeric input: '{}'", val.print())
-        }
+fn builtin_subtract(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    let name = "-";
+    let transformer_bi = |left:BigInt, right: BigInt| left - right;
+    let transformer_br = |left:BigRational, right: BigRational| left - right;
+    match builtin_arithmetic(args, env, name, transformer_bi, transformer_br) {
+        Ok(v) => v,
+        Err(e) => fail!("{}: {}", name, e)
     }
-    let out_val = if hasFloats {
-        let mut out_val = match args.shift()
-            .expect("head of multiply args should be Some()") {
-                v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.into_float().unwrap(),
-                _ => fail!("multiply: cannot process non-numeric input")
-            };
-        for atom in args.move_iter() {
-            match atom {
-                v @ Atom(Integer(_)) | v @ Atom(Float(_)) =>
-                    out_val = out_val * v.into_float().unwrap(),
-                _ => fail!("multiply: invoking with non numeric input")
-            }
-        }
-        Atom(Float(out_val))
-    } else {
-        let mut out_val = match args.shift()
-            .expect("head of multiply args should be Some()") {
-                v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.into_integer().unwrap(),
-                _ => fail!("multiply: cannot process non-numeric input")
-            };
-        for atom in args.move_iter() {
-            match atom {
-                Atom(Integer(val)) => out_val = out_val * val,
-                _ => fail!("multiply: invoking with non numeric input")
-            }
-        }
-        Atom(Integer(out_val))
-    };
-    (Some(out_val), env)
 }
 
-fn builtin_divide(mut args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
-    let mut hasFloats = false;
-    for atom in args.iter() {
-        match atom {
-            &Atom(Float(_)) => hasFloats = true,
-            &Atom(Integer(_)) => {},
-            val => fail!("divide: invoking with non numeric input: '{}'", val.print())
-        }
+fn builtin_multiply(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    let name = "*";
+    let transformer_bi = |left:BigInt, right: BigInt| left * right;
+    let transformer_br = |left:BigRational, right: BigRational| left * right;
+    match builtin_arithmetic(args, env, name, transformer_bi, transformer_br) {
+        Ok(v) => v,
+        Err(e) => fail!("{}: {}", name, e)
     }
-    let out_val = if hasFloats {
-        let mut out_val = match args.shift()
-            .expect("head of divide args should be Some()") {
-                v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.into_float().unwrap(),
-                _ => fail!("divide: cannot process non-numeric input")
-            };
-        for atom in args.move_iter() {
-            match atom {
-                v @ Atom(Integer(_)) | v @ Atom(Float(_)) =>
-                    out_val = out_val / v.into_float().unwrap(),
-                _ => fail!("divide: invoking with non numeric input")
-            }
-        }
-        Atom(Float(out_val))
-    } else {
-        let mut out_val = match args.shift()
-            .expect("head of divide args should be Some()") {
-                v @ Atom(Integer(_)) | v @ Atom(Float(_)) => v.into_integer().unwrap(),
-                _ => fail!("divide: cannot process non-numeric input")
-            };
-        for atom in args.move_iter() {
-            match atom {
-                Atom(Integer(val)) => out_val = out_val / val,
-                _ => fail!("divide: invoking with non numeric input")
-            }
-        }
-        Atom(Integer(out_val))
-    };
-    (Some(out_val), env)
+}
+
+fn builtin_divide(args: Vec<Expr>, env: Env) -> (Option<Expr>, Env) {
+    let name = "/";
+    let transformer_bi = |left:BigInt, right: BigInt| left / right;
+    let transformer_br = |left:BigRational, right: BigRational| left / right;
+    match builtin_arithmetic(args, env, name, transformer_bi, transformer_br) {
+        Ok(v) => v,
+        Err(e) => fail!("{}: {}", name, e)
+    }
 }
 
 fn builtin_predicate_compare(mut args: Vec<Expr>,
