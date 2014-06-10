@@ -5,7 +5,7 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use collections::hashmap::HashMap;
+use std::collections::hashmap::HashMap;
 use expr::{Expr, ExprResult};
 use result::SchemerResult;
 
