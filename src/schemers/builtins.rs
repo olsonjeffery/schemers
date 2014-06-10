@@ -258,7 +258,11 @@ fn builtin_length(mut args: Vec<Expr>, env: Env) -> SchemerResult<(Option<Expr>,
         Some(v) => match v {
             List(items) => {
                 println!("length: {}", items.len());
-                Ok((Some(Atom(Number::uint(items.len()))), env))
+                let num_val = match Number::uint(items.len()) {
+                    Ok(v) => v,
+                    Err(e) => return Err(e)
+                };
+                Ok((Some(Atom(num_val)), env))
             }
             _ => return Err(format!("length: expecting a list parameter"))
         }, None => return Err("length: head of args is None".to_string())

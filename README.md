@@ -12,8 +12,8 @@ The codebase is well tested, with many examples demonstrating the use of all of 
   * <s>`env`</s>
   * `eval`
   * <s>`parse`</s>
-  * `expr`
-  * `builtins`
+  * <s>`expr`</s>
+  * <s>`builtins`</s>
   * After this work is done, some build-script needs to be done to guarantee against the reintroduction of such API calls (`tidy.py` work?)
 * `lambda` is currently non-spec because it doesn't store/capture the surrounding `Env` (this use case isn't capture in the first essay's test suite); Is simple to implement, but perf will be ugly because of all the `Env` copying
 * TCO
