@@ -17,6 +17,7 @@ The codebase is well tested, with many examples demonstrating the use of all of 
   * After this work is done, some build-script needs to be done to guarantee against the reintroduction of such API calls (`tidy.py` work?)
 * `lambda` is currently non-spec because it doesn't store/capture the surrounding `Env` (this use case isn't capture in the first essay's test suite); Is simple to implement, but perf will be ugly because of all the `Env` copying
 * TCO
+  * `fact(100)` in the `norvig_suite` is currently disabled. This obviously needs to be enabled again (and work!)
 * Some benchmarks:
   * `fact(1000)` (can't be done before TCO lands)
   * Some kind of `Env`-copy/`lambda`-centric benchmark to get data before working on `Env`/`Expr`-passing refactor below
