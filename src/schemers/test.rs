@@ -514,7 +514,8 @@ mod eval_tests {
     #[test]
     fn begin_can_have_a_list_in_the_tail_position() {
         let env = Env::new_empty();
-        let (out_expr, env) = test_eval!("(begin (define x 37) (quote (1 x 3.4)))".to_string(), env);
+        let (out_expr, env) =
+            test_eval!("(begin (define x 37) (quote (1 x 3.4)))".to_string(), env);
         assert_eq!(env.find(&"x".to_string()).unwrap(), Atom(Number::integer(37).unwrap()));
         match out_expr.unwrap() {
             List(items) => {
@@ -528,7 +529,8 @@ mod eval_tests {
     #[test]
     fn can_define_a_var_with_the_same_name_as_a_special_form_keyword_but_sf_is_still_usable() {
         let env = Env::new_empty();
-        let (out_expr, _) = test_eval!("(begin (define set! 42) (set! set! 37) set!)".to_string(), env);
+        let (out_expr, _) =
+            test_eval!("(begin (define set! 42) (set! set! 37) set!)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Number::integer(37).unwrap()));
     }
 

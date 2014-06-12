@@ -38,7 +38,7 @@ fn main() {
         Err(err) => fail!("ERROR: {}", err)
     };
     match eval::eval(expr, env) {
-        (Some(expr), _) => match expr.print() {
+        Ok((Some(expr), _)) => match expr.print() {
             Ok(expr) =>
                 println!("=> {}", expr),
             Err(e) => println!("ERROR: {}", e)
