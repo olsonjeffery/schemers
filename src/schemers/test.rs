@@ -9,8 +9,12 @@ macro_rules! test_eval(
     ($code:expr, $env:expr) =>
         {
             match read($code.clone()) {
-                Ok(expr) => eval(expr, $env),
-                Err(e) => fail!("test_eval failed with code: {} , error: {}",
+                Ok(expr) => match eval(expr, $env) {
+                    Ok(res) => res,
+                    Err(e) => fail!("test_eval failed in eval() with code: {}, error: {}",
+                                    $code, e)
+                },
+                Err(e) => fail!("test_eval failed in read() with code: {} , error: {}",
                                 $code, e)
             }
         };
@@ -312,16 +316,14 @@ mod eval_tests {
     #[test]
     fn an_if_call_with_a_false_test_should_resolve_the_alt_branch() {
         let env = Env::new_empty();
-        let in_expr = read("(if #f (quote conseq) (quote alt))".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(if #f (quote conseq) (quote alt))".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Symbol("alt".to_string())));
     }
 
     #[test]
     fn calling_eval_with_an_empty_list_should_return_the_list_as_a_value() {
         let env = Env::new_empty();
-        let in_expr = read("()".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("()".to_string(), env);
         match out_expr.unwrap() {
             list @ List(_) => {
                 assert_eq!(list.is_null(), true);
@@ -334,8 +336,7 @@ mod eval_tests {
     #[should_fail]
     fn calling_set_on_a_var_not_in_the_scope_should_fail() {
         let env = Env::new_empty();
-        let in_expr = read("(set! x 123)".to_string()).unwrap();
-        eval(in_expr, env);
+        test_eval!("(set! x 123)".to_string(), env);
     }
 
     #[test]
@@ -343,8 +344,7 @@ mod eval_tests {
         let env = Env::new(
             Some(vec!("x".to_string())), Some(vec!(Atom(Number::integer(42).unwrap()))),
             None).unwrap();
-        let in_expr = read("(set! x 123)".to_string()).unwrap();
-        let (_, env) = eval(in_expr, env);
+        let (_, env) = test_eval!("(set! x 123)".to_string(), env);
         assert_eq!(env.find(&"x".to_string()).unwrap(), Atom(Number::integer(123).unwrap()));
     }
 
@@ -353,8 +353,7 @@ mod eval_tests {
         let env = Env::new(
             Some(vec!("x".to_string())), Some(vec!(Atom(Number::integer(42).unwrap()))),
             None).unwrap();
-        let in_expr = read("(set! x (quote 37))".to_string()).unwrap();
-        let (_, env) = eval(in_expr, env);
+        let (_, env) = test_eval!("(set! x (quote 37))".to_string(), env);
         assert_eq!(env.find(&"x".to_string()).unwrap(), Atom(Number::integer(37).unwrap()));
     }
 
@@ -366,8 +365,7 @@ mod eval_tests {
         let env = Env::new(
             None, None,
             Some(outer_env)).unwrap();
-        let in_expr = read("(set! x 43)".to_string()).unwrap();
-        let (_, env) = eval(in_expr, env);
+        let (_, env) = test_eval!("(set! x 43)".to_string(), env);
         assert_eq!(env.find(&"x".to_string()).unwrap(), Atom(Number::integer(43).unwrap()));
     }
 
@@ -376,8 +374,7 @@ mod eval_tests {
         let env = Env::new(
             Some(vec!("x".to_string())), Some(vec!(Atom(Number::integer(42).unwrap()))),
             None).unwrap();
-        let in_expr = read("(set! x 43)".to_string()).unwrap();
-        let (result, _) = eval(in_expr, env);
+        let (result, _) = test_eval!("(set! x 43)".to_string(), env);
         assert_eq!(result, None);
     }
 
@@ -385,8 +382,7 @@ mod eval_tests {
     #[should_fail]
     fn calling_set_with_a_non_symbol_as_the_atom_should_fail() {
         let env = Env::new_empty();
-        let in_expr = read("(set! 1 123)".to_string()).unwrap();
-        eval(in_expr, env);
+        test_eval!("(set! 1 123)".to_string(), env);
     }
 
     #[test]
@@ -394,8 +390,8 @@ mod eval_tests {
         let env = Env::new(
             Some(vec!("x".to_string())), Some(vec!(Atom(Number::integer(42).unwrap()))),
             None).unwrap();
-        let in_expr = read("(if (set! x 37) (quote conseq) (quote alt))".to_string()).unwrap();
-        let (out_expr, env) = eval(in_expr, env);
+        let (out_expr, env) = test_eval!(
+            "(if (set! x 37) (quote conseq) (quote alt))".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Symbol("conseq".to_string())));
         assert_eq!(env.find(&"x".to_string()).unwrap(), Atom(Number::integer(37).unwrap()));
     }
@@ -408,24 +404,21 @@ mod eval_tests {
     #[test]
     fn evaling_a_define_should_return_none() {
         let env = Env::new_empty();
-        let in_expr = read("(define x 123)".to_string()).unwrap();
-        let (result, _) = eval(in_expr, env);
+        let (result, _) = test_eval!("(define x 123)".to_string(), env);
         assert!(result.is_none());
     }
 
     #[test]
     fn defining_a_var_should_set_it_in_the_scope() {
         let env = Env::new_empty();
-        let in_expr = read("(define x 123)".to_string()).unwrap();
-        let (_, env) = eval(in_expr, env);
+        let (_, env) = test_eval!("(define x 123)".to_string(), env);
         assert_eq!(env.find(&"x".to_string()).unwrap(), Atom(Number::integer(123).unwrap()));
     }
 
     #[test]
     fn calling_define_should_resolve_the_val_of_the_input() {
         let env = Env::new_empty();
-        let in_expr = read("(define x (quote foo))".to_string()).unwrap();
-        let (_, env) = eval(in_expr, env);
+        let (_, env) = test_eval!("(define x (quote foo))".to_string(), env);
         assert_eq!(env.find(&"x".to_string()).unwrap(), Atom(Symbol("foo".to_string())));
     }
 
@@ -435,8 +428,7 @@ mod eval_tests {
             Some(vec!("x".to_string())), Some(vec!(Atom(Number::integer(42).unwrap()))),
             None).unwrap();
         let env = Env::new(None, None, Some(outer_env)).unwrap();
-        let in_expr = read("(define x 37)".to_string()).unwrap();
-        let (_, env) = eval(in_expr, env);
+        let (_, env) = test_eval!("(define x 37)".to_string(), env);
         assert_eq!(env.find(&"x".to_string()).unwrap(), Atom(Number::integer(37).unwrap()));
         let outer_env = env.into_parent().unwrap();
         assert_eq!(outer_env.find(&"x".to_string()).unwrap(), Atom(Number::integer(42).unwrap()));
@@ -445,8 +437,7 @@ mod eval_tests {
     #[test]
     fn lambda_exprs_should_expect_a_list_for_vars_and_an_expr_for_body() {
         let env = Env::new_empty();
-        let in_expr = read("(lambda (x) 37)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(lambda (x) 37)".to_string(), env);
         match out_expr.unwrap() {
             Atom(Lambda(body)) => {
                 match body {
@@ -462,8 +453,7 @@ mod eval_tests {
     #[test]
     fn lambda_exprs_evald_outside_of_define_have_the_name_of_anonymous() {
         let env = Env::new_empty();
-        let in_expr = read("(lambda (x y) 37)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(lambda (x y) 37)".to_string(), env);
         let out_expr = out_expr.unwrap();
         let out_expr_as_str = out_expr.print().unwrap();
         match out_expr {
@@ -480,8 +470,7 @@ mod eval_tests {
     #[test]
     fn lambda_exprs_evald_within_a_define_have_the_of_the_provided_var_symbol() {
         let env = Env::new_empty();
-        let in_expr = read("(define foo (lambda (x y) 37))".to_string()).unwrap();
-        let (_, env) = eval(in_expr, env);
+        let (_, env) = test_eval!("(define foo (lambda (x y) 37))".to_string(), env);
         let out_expr = env.find(&"foo".to_string()).unwrap();
         let out_expr_as_str = out_expr.print().unwrap();
         match out_expr {
@@ -499,38 +488,33 @@ mod eval_tests {
     #[should_fail]
     fn lambda_expr_eval_should_fail_if_a_list_isnt_in_the_vars_position() {
         let env = Env::new_empty();
-        let in_expr = read("(define foo (lambda x 37))".to_string()).unwrap();
-        eval(in_expr, env);
+        test_eval!("(define foo (lambda x 37))".to_string(), env);
     }
     #[test]
     #[should_fail]
     fn lambda_expr_eval_should_fail_if_theres_no_third_position() {
         let env = Env::new_empty();
-        let in_expr = read("(define foo (lambda (x)))".to_string()).unwrap();
-        eval(in_expr, env);
+        test_eval!("(define foo (lambda (x)))".to_string(), env);
     }
 
     #[test]
     fn begin_should_return_the_evald_atom_expr_of_the_tail_param() {
         let env = Env::new_empty();
-        let in_expr = read("(begin (define x 37) 42)".to_string()).unwrap();
-        let (out_expr, env) = eval(in_expr, env);
+        let (out_expr, env) = test_eval!("(begin (define x 37) 42)".to_string(), env);
         assert_eq!(env.find(&"x".to_string()).unwrap(), Atom(Number::integer(37).unwrap()));
         assert_eq!(out_expr.unwrap(), Atom(Number::integer(42).unwrap()));
     }
     #[test]
     fn begin_should_return_no_expr_if_its_tail_param_returns_nothing() {
         let env = Env::new_empty();
-        let in_expr = read("(begin (define x 37))".to_string()).unwrap();
-        let (out_expr, env) = eval(in_expr, env);
+        let (out_expr, env) = test_eval!("(begin (define x 37))".to_string(), env);
         assert_eq!(env.find(&"x".to_string()).unwrap(), Atom(Number::integer(37).unwrap()));
         assert_eq!(out_expr, None);
     }
     #[test]
     fn begin_can_have_a_list_in_the_tail_position() {
         let env = Env::new_empty();
-        let in_expr = read("(begin (define x 37) (quote (1 x 3.4)))".to_string()).unwrap();
-        let (out_expr, env) = eval(in_expr, env);
+        let (out_expr, env) = test_eval!("(begin (define x 37) (quote (1 x 3.4)))".to_string(), env);
         assert_eq!(env.find(&"x".to_string()).unwrap(), Atom(Number::integer(37).unwrap()));
         match out_expr.unwrap() {
             List(items) => {
@@ -544,18 +528,15 @@ mod eval_tests {
     #[test]
     fn can_define_a_var_with_the_same_name_as_a_special_form_keyword_but_sf_is_still_usable() {
         let env = Env::new_empty();
-        let in_expr = read("(begin (define set! 42) (set! set! 37) set!)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(begin (define set! 42) (set! set! 37) set!)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Number::integer(37).unwrap()));
     }
 
     #[test]
     fn can_define_a_lambda_that_returns_an_atom_and_subsequently_invoke_it() {
         let env = Env::new_empty();
-        let in_expr = read("(define get-1 (lambda () 1))".to_string()).unwrap();
-        let (_, env) = eval(in_expr, env);
-        let in_expr = read("(get-1)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (_, env) = test_eval!("(define get-1 (lambda () 1))".to_string(), env);
+        let (out_expr, _) = test_eval!("(get-1)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Number::integer(1).unwrap()));
     }
 
@@ -571,8 +552,7 @@ mod eval_tests {
     #[test]
     fn builtin_print_sanity_check() {
         let env = add_builtins(Env::new_empty());
-        let in_expr = read("+".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("+".to_string(), env);
         assert_eq!(out_expr.unwrap().print().unwrap(), "builtin-fn:+".to_string());
     }
 }
@@ -587,135 +567,109 @@ mod builtins_tests {
     #[test]
     fn two_plus_two_equals_four() {
         let env = add_builtins(Env::new_empty());
-        let in_expr = read("(+ 2 2)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(+ 2 2)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Number::integer(4).unwrap()));
     }
     #[test]
     fn can_sum_an_arbitrary_number_of_items() {
         let env = add_builtins(Env::new_empty());
-        let in_expr = read("(+ 2 2 1 1 1 1 4)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(+ 2 2 1 1 1 1 4)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Number::integer(12).unwrap()));
     }
     #[test]
     fn two_point_five_plus_two_equals_four_point_five() {
         let env = add_builtins(Env::new_empty());
-        let in_expr = read("(+ 2.5 2)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(+ 2.5 2)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Number::float(4.5).unwrap()));
     }
     #[test]
     fn four_minus_three_equals_one() {
         let env = add_builtins(Env::new_empty());
-        let in_expr = read("(- 4 3)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(- 4 3)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Number::integer(1).unwrap()));
     }
     #[test]
     fn four_point_five_minus_one_equals_equals_three_point_five() {
         let env = add_builtins(Env::new_empty());
-        let in_expr = read("(- 4.5 1)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(- 4.5 1)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Number::float(3.5).unwrap()));
     }
     #[test]
     fn can_subtract_an_arbitrary_number_of_items() {
         let env = add_builtins(Env::new_empty());
-        let in_expr = read("(- 4.5 1 3)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(- 4.5 1 3)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Number::float(0.5).unwrap()));
     }
     #[test]
     fn two_times_twenty_one_equals_42() {
         let env = add_builtins(Env::new_empty());
-        let in_expr = read("(* 2 21)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(* 2 21)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Number::integer(42).unwrap()));
     }
     #[test]
     fn can_multiply_an_aribtrary_number_of_items() {
         let env = add_builtins(Env::new_empty());
-        let in_expr = read("(* 4 5 3)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(* 4 5 3)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Number::integer(60).unwrap()));
     }
     #[test]
     fn two_times_one_point_five_equals_three() {
         let env = add_builtins(Env::new_empty());
-        let in_expr = read("(* 2 1.5)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(* 2 1.5)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Number::float(3.0).unwrap()));
     }
     #[test]
     fn ten_divided_by_5_equals_2() {
         let env = add_builtins(Env::new_empty());
-        let in_expr = read("(/ 10 5)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(/ 10 5)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Number::integer(2).unwrap()));
     }
     #[test]
     fn five_divided_by_two_point_five_equals_2() {
         let env = add_builtins(Env::new_empty());
-        let in_expr = read("(/ 5 2.5)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(/ 5 2.5)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Number::float(2.0).unwrap()));
     }
     #[test]
     fn can_divide_an_arbitrary_number_of_items() {
         let env = add_builtins(Env::new_empty());
-        let in_expr = read("(/ 100 10 5)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(/ 100 10 5)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Number::integer(2).unwrap()));
     }
     #[test]
     fn lt_works() {
         let env = add_builtins(Env::new_empty());
-        let in_expr = read("(< 2 4)".to_string()).unwrap();
-        let (out_expr, env) = eval(in_expr, env);
+        let (out_expr, env) = test_eval!("(< 2 4)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
-        let in_expr = read("(< 5 1)".to_string()).unwrap();
-        let (out_expr, env) = eval(in_expr, env);
+        let (out_expr, env) = test_eval!("(< 5 1)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
-        let in_expr = read("(< 1.1 1.2)".to_string()).unwrap();
-        let (out_expr, env) = eval(in_expr, env);
+        let (out_expr, env) = test_eval!("(< 1.1 1.2)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
-        let in_expr = read("(< 1.1 2)".to_string()).unwrap();
-        let (out_expr, env) = eval(in_expr, env);
+        let (out_expr, env) = test_eval!("(< 1.1 2)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
-        let in_expr = read("(< 1.0 1)".to_string()).unwrap();
-        let (out_expr, env) = eval(in_expr, env);
+        let (out_expr, env) = test_eval!("(< 1.0 1)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
-        let in_expr = read("(< 1 1)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(< 1 1)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
     }
     #[test]
     fn gt_works() {
         let env = add_builtins(Env::new_empty());
-        let in_expr = read("(> 4 2)".to_string()).unwrap();
-        let (out_expr, env) = eval(in_expr, env);
+        let (out_expr, env) = test_eval!("(> 4 2)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
-        let in_expr = read("(> 1 5)".to_string()).unwrap();
-        let (out_expr, env) = eval(in_expr, env);
+        let (out_expr, env) = test_eval!("(> 1 5)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
-        let in_expr = read("(> 1.2 1.1)".to_string()).unwrap();
-        let (out_expr, env) = eval(in_expr, env);
+        let (out_expr, env) = test_eval!("(> 1.2 1.1)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
-        let in_expr = read("(> 2 1.1)".to_string()).unwrap();
-        let (out_expr,env) = eval(in_expr, env);
+        let (out_expr, env) = test_eval!("(> 2 1.1)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
-        let in_expr = read("(not #f)".to_string()).unwrap();
-        let (out_expr, env) = eval(in_expr, env);
+        let (out_expr, env) = test_eval!("(not #f)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
-        let in_expr = read("(not (quote #f))".to_string()).unwrap();
-        let (out_expr, env) = eval(in_expr, env);
+        let (out_expr, env) = test_eval!("(not (quote #f))".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(true)));
-        let in_expr = read("(> 1.0 1)".to_string()).unwrap();
-        let (out_expr, env) = eval(in_expr, env);
+        let (out_expr, env) = test_eval!("(> 1.0 1)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
-        let in_expr = read("(> 1 1)".to_string()).unwrap();
-        let (out_expr, _) = eval(in_expr, env);
+        let (out_expr, _) = test_eval!("(> 1 1)".to_string(), env);
         assert_eq!(out_expr.unwrap(), Atom(Boolean(false)));
     }
     #[test]

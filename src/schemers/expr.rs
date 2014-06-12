@@ -222,7 +222,7 @@ impl Expr {
                 let mut env = env;
                 let mut evald_args = Vec::new();
                 for i in args.move_iter() {
-                    let (evald_arg, out_env) = eval(i, env);
+                    let (evald_arg, out_env) = try!(eval(i, env));
                     let evald_arg = match evald_arg {
                         Some(v) => v,
                         _ => return Err("eval'd arg should ret expr".to_string())

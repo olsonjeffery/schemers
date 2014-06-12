@@ -7,33 +7,38 @@
 
 use expr::{Expr, Atom, List, Symbol, Boolean, Lambda, UserDefined, BuiltIn};
 use env::Env;
+use result::SchemerResult;
+pub type EvalResult = SchemerResult<(Option<Expr>, Env)>;
 
-pub fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
+macro_rules! try_opt(
+    ($e:expr, $msg:expr) => (match $e {
+        Some(e) => e,
+        None => return Err($msg) })
+)
+
+pub fn eval<'env>(expr: Expr, env: Env) -> EvalResult {
     match expr {
         // Atom values and values in the Env
         Atom(Symbol(ref var_name)) => {
-            let out_val = match env.find(var_name) {
-                Ok(expr) => expr,
-                Err(err) => fail!("eval: failure to resolve symbol: {}", err)
-            };
-            (Some(out_val.clone()), env)
+            let out_val = try!(env.find(var_name));
+            Ok((Some(out_val.clone()), env))
         },
-        val @ Atom(_) => (Some(val), env),
+        val @ Atom(_) => Ok((Some(val), env)),
         list @ List(_) => {
             if list.is_null() {
-                return (Some(list), env);
+                return Ok((Some(list), env));
             }
-            let (car, cdr) = match list.un_cons() {
-                Ok(v) => v,
-                Err(e) => fail!("eval(): un_cons() failed: {}", e)
-            };
+            let (car, cdr) = try!(list.un_cons());
             match car {
                 Atom(ref val) if *val == Symbol("quote".to_string())  => {
                     match cdr {
-                        List(mut items) =>
-                            (Some(*items.shift().expect("eval: quote list shouldnt be empty")),
-                             env),
-                        _ => fail!("eval: quote: expected List in cdr position")
+                        List(mut items) => {
+                            let quoted_item =
+                                *try_opt!(items.shift(),
+                                         "eval: quote list shouldnt be empty".to_string());
+                            Ok((Some(quoted_item), env))
+                        },
+                        _ => return Err("eval: quote: expected List in cdr position".to_string())
                     }
                 },
                 Atom(ref val) if *val == Symbol("if".to_string()) => {
@@ -43,32 +48,36 @@ pub fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                     match cdr {
                         List(mut items) => {
                             if items.len() != 2 {
-                                fail!("eval: set!: expected two entries");
+                                return Err("eval: set!: expected two entries".to_string());
                             }
-                            match *items.shift().expect("eval: set!: var name should have value") {
+                            let set_val = *try_opt!(items.shift(),
+                                "eval: set!: var name should have value".to_string());
+                            match set_val {
                                 Atom(Symbol(name)) => {
+                                    let item = *try_opt!(items.pop(),
+                                         "eval: set! val not provided".to_string());
                                     let (val_expr, mut env) =
-                                        eval(*items.pop()
-                                             .expect("eval: set! val not provided"), env);
-                                    match env.set(name,
-                                        val_expr.expect(
-                                            "eval: set!: provided val didn't resolve")) {
-                                        Err(err) => fail!("eval: set! err: {}", err),
-                                        _ => {}
-                                    };
-                                    (None, env)
+                                        try!(eval(item, env));
+
+                                    let val_expr = try_opt!(val_expr,
+                                         "eval: set!: provided val didn't resolve".to_string());
+                                    try!(env.set(name, val_expr));
+                                    Ok((None, env))
                                 },
-                                _ => fail!("eval: set!: atom in var name position must be symbol")
+                                _ => return Err("eval: set!: atom in var name \
+                                   position must be symbol".to_string())
                             }
                         },
-                        _ => fail!("eval: set!: expected list in cdr position")
+                        _ => return Err("eval: set!: expected list in cdr position".to_string())
                     }
                 },
                 Atom(ref val) if *val == Symbol("define".to_string()) => {
-                    (None, eval_define(cdr, env))
+                    let out_env = try!(eval_define(cdr, env));
+                    Ok((None, out_env))
                 },
                 Atom(ref val) if *val == Symbol("lambda".to_string()) => {
-                    (eval_lambda("anonymous".to_string(), cdr), env)
+                    let eval_result = try!(eval_lambda("anonymous".to_string(), cdr));
+                    Ok((eval_result, env))
                 },
                 Atom(ref val) if *val == Symbol("begin".to_string()) => {
                     eval_begin(cdr, env)
@@ -84,24 +93,21 @@ pub fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                         Atom(Lambda(UserDefined(_, vars, body))) => {
                             match cdr {
                                 args @ List(_) => {
-                                    let (args, env) = match args.unbox_and_eval(env) {
-                                        Ok(r) => r,
-                                        Err(e) => fail!("eval(): unbox failure: {}", e)
-                                    };
+                                    let (args, env) = try!(args.unbox_and_eval(env));
                                     let new_env = match Env::new(Some(vars),
                                                            Some(args), Some(env)) {
                                         Ok(env) => env,
                                         Err(e) =>
-                                            fail!("eval(): failure to nest env: {}", e)
+                                            return Err(format!("eval(): failure to nest env: {}", e))
                                     };
-                                    let (out_expr, new_env) = eval(*body, new_env);
+                                    let (out_expr, new_env) = try!(eval(*body, new_env));
                                     let parent = match new_env.into_parent() {
                                         Some(env) => env,
-                                        None => fail!("eval: failed to get/unwrap parent env")
+                                        None => return Err("eval: failed to get parent env".to_string())
                                     };
-                                    (out_expr, parent)
+                                    Ok((out_expr, parent))
                                 },
-                                _ => fail!("eval: proc invoke: should've gotten a list in the cdr")
+                                _ => return Err("eval: proc invoke: should've gotten a list in the cdr".to_string())
                             }
                         },
                         Atom(Lambda(BuiltIn(_, _body_fn))) => {
@@ -111,112 +117,125 @@ pub fn eval<'env>(expr: Expr, env: Env) -> (Option<Expr>, Env) {
                                         Ok(r) => r,
                                         Err(e) => fail!("eval(): failure in unbox: {}", e)
                                     };
-                                    _body_fn(args, env).unwrap()
+                                    let result = try!(_body_fn(args, env));
+                                    Ok(result)
                                 },
-                                _ => fail!("expected cdr to be List(...)")
+                                _ => return Err("expected cdr to be List(...)".to_string())
                             }
-                        }, _ => fail!("defined var {} is not a procedure!", proc_name)
+                        }, _ => return Err(format!("defined var {} is not a procedure!", proc_name))
                     }
-                }, _ => fail!("car of list isn't a symbol for invocation lookup")
+                }, _ => return Err("car of list isn't a symbol for invocation lookup".to_string())
             }
         }
     }
 }
 
-fn eval_define(cdr: Expr, env: Env) -> Env {
+fn eval_define(cdr: Expr, env: Env) -> SchemerResult<Env> {
     match cdr {
         List(mut items) => {
             if items.len() != 2 {
-                fail!("eval: define: expected two entries");
+                return Err("eval: define: expected two entries".to_string());
             }
-            match *items.shift()
-                .expect("eval: define: var name should have value") {
+            let item = *try_opt!(items.shift(),
+                                "eval: define: var name should have value".to_string());
+            match item {
                     Atom(Symbol(name)) => {
-                        let val_expr = *items.pop().expect("eval: define: value should be there");
+                        let val_expr =
+                            *try_opt!(items.pop(),
+                                     "eval: define: value should be there".to_string());
                         let (val_expr, mut env) = {
                             if val_expr.is_atom() {
-                                eval(val_expr , env)
+                                try!(eval(val_expr , env))
                             } else {
                                 let (car, cdr) = match val_expr.clone().un_cons() {
                                     Ok(v) => v,
-                                    Err(e) => fail!("eval_define(): un_cons failed: {}", e)
+                                    Err(e) => return Err(e)
                                 };
                                 match car {
                                     Atom(ref val) if *val == Symbol("lambda".to_string()) => {
-                                        (eval_lambda(name.to_string(), cdr), env)
+                                        let result = try!(eval_lambda(name.to_string(), cdr));
+                                        (result, env)
                                     }
-                                    _ => eval(val_expr , env)
+                                    _ => try!(eval(val_expr , env))
                                 }
                             }
                         };
-                        env.define(name,
-                                   val_expr.expect(
-                                       "eval: define: val expr should return something"));
-                        env
+                        let val_expr = try_opt!(val_expr, "eval: define: got None for val".to_string());
+                        env.define(name, val_expr);
+                        Ok(env)
                     },
-                    _ => fail!("eval: define: atom in var pos. must be symbol")
+                    _ => return Err("eval: define: atom in var pos. must be symbol".to_string())
                 }
         },
-        _ => fail!("eval: define: expected list in cdr position")
+        _ => return Err("eval: define: expected list in cdr position".to_string())
     }
 }
 
-fn eval_lambda(name: String, cdr: Expr) -> Option<Expr> {
+fn eval_lambda(name: String, cdr: Expr) -> SchemerResult<Option<Expr>> {
     match cdr {
         List(mut items) => {
             if items.len() != 2 {
-                fail!("eval: lambda: expected two entries in cdr");
+                return Err("eval: lambda: expected two entries in cdr".to_string());
             }
             let mut var_names = Vec::new();
-            match *items.shift().expect("eval: lambda: vars should be there") {
+            let item = *try_opt!(items.shift(),
+                                "eval: lambda: vars should be there".to_string());
+            match item {
                 List(vars) => {
                     for v in vars.move_iter() {
                         match v {
                             box Atom(Symbol(var_name)) => {
                                 var_names.push(var_name.to_string());
                             },
-                            _ => fail!("eval: lambda: var names must be symbols")
+                            _ => return Err("eval: lambda: var names must be symbols".to_string())
                         }
                     }
-                }, _ => fail!("eval: lambda: expect vars to be list")
+                }, _ => return Err("eval: lambda: expect vars to be list".to_string())
             }
-            Some(Atom(Lambda(UserDefined(name, var_names, items.shift()
-                                         .expect("eval: lambda: lambda body should be there")))))
+            let item = try_opt!(items.shift(),
+                                "eval: lambda: lambda body should be there".to_string());
+            Ok(Some(Atom(Lambda(UserDefined(name, var_names, item)))))
         },
-        _ => fail!("eval: lambda: expected list in cdr position")
+        _ => return Err("eval: lambda: expected list in cdr position".to_string())
     }
 }
 
-fn eval_begin(cdr: Expr, env: Env) -> (Option<Expr>, Env) {
+fn eval_begin(cdr: Expr, env: Env) -> EvalResult {
     match cdr {
         List(items) => {
             let (mut out_expr, mut env) = (None, env);
             for e in items.move_iter() {
-                let (res_expr, res_env) = eval(*e, env);
+                let (res_expr, res_env) = try!(eval(*e, env));
                 out_expr = res_expr;
                 env = res_env;
             }
-            (out_expr, env)
+            Ok((out_expr, env))
         },
-        _ => fail!("eval: begin: expcted a list for the input cdr")
+        _ => return Err("eval: begin: expcted a list for the input cdr".to_string())
     }
 }
 
-fn eval_if(cdr: Expr, env: Env) -> (Option<Expr>, Env) {
+fn eval_if(cdr: Expr, env: Env) -> EvalResult {
     match cdr {
         List(mut items) => {
             if items.len() != 3 {
-                fail!("eval: if: expect three entries in if cdr list");
+                return Err("eval: if: expect three entries in if cdr list".to_string());
             }
-            let (out_expr, out_env) = eval(
-                *items.shift().unwrap(), env);
+            let first_arg = *try_opt!(items.shift(),
+                "eval: if: expected some val in arg first position".to_string());
+            let (out_expr, out_env) = try!(eval(
+                first_arg, env));
             match out_expr {
                 Some(Atom(Boolean(false))) => {
-                    eval(*items.pop().unwrap(), out_env)
+                    let consq_branch = *try_opt!(items.pop(),
+                                                "eval: if: got none in conseq branch".to_string());
+                    eval(consq_branch, out_env)
                 },
-                _ => eval(*items.shift().unwrap(), out_env)
+                _ => eval(*try_opt!(items.shift(),
+                                   "eval: if: got none in else branch".to_string()),
+                          out_env)
             }
         },
-        _ => fail!("eval: if: expected List in cdr position")
+        _ => return Err("eval: if: expected List in cdr position".to_string())
     }
 }
