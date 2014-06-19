@@ -12,6 +12,7 @@ use result::SchemerResult;
 pub type EnvResult = SchemerResult<Env>;
 pub type EnvSetResult = SchemerResult<()>;
 
+#[deriving(Clone)]
 pub struct Env {
     entries: HashMap<String, Expr>,
     outer: Option<Box<Env>>
@@ -88,6 +89,13 @@ impl Env {
                                    , *symbol))
                 }
             }
+        }
+    }
+
+    pub fn enclose(&mut self, base: Env) {
+        match self.outer {
+            Some(ref mut outer) => outer.enclose(base),
+            None => self.outer = Some(box base)
         }
     }
 

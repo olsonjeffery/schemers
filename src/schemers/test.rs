@@ -441,7 +441,7 @@ mod eval_tests {
         match out_expr.unwrap() {
             Atom(Lambda(body)) => {
                 match body {
-                    UserDefined(_, vars, body) => {
+                    UserDefined(_, vars, body, _) => {
                         assert_eq!(vars.len(), 1);
                         assert_eq!(vars.get(0), &"x".to_string());
                         assert_eq!(*body, Atom(Number::integer(37).unwrap()));
@@ -459,7 +459,7 @@ mod eval_tests {
         match out_expr {
             Atom(Lambda(body)) => {
                 match body {
-                    UserDefined(name, _, _) => {
+                    UserDefined(name, _, _, _) => {
                         assert_eq!(name, "anonymous".to_string());
                     }, _ => fail!("expected a UserDefined")
                 }
@@ -476,7 +476,7 @@ mod eval_tests {
         match out_expr {
             Atom(Lambda(body)) => {
                 match body {
-                    UserDefined(name, _, _) => {
+                    UserDefined(name, _, _, _) => {
                         assert_eq!(name, "foo".to_string());
                     }, _ => fail!("expected a UserDefined")
                 }
@@ -556,6 +556,24 @@ mod eval_tests {
         let env = add_builtins(Env::new_empty());
         let (out_expr, _) = test_eval!("+".to_string(), env);
         assert_eq!(out_expr.unwrap().print().unwrap(), "builtin-fn:+".to_string());
+    }
+
+    #[test]
+    fn lambdas_should_store_their_captured_environment() {
+        let env = add_builtins(Env::new_empty());
+        let (_, env) = test_eval!("  \
+          (define get_sqr (lambda () (begin \
+            (define two 2)                  \
+            (lambda (x) (* x two))          \
+          )))                               \
+        ".to_string(), env);
+        let (out_expr, _) = test_eval!("\
+          (begin
+            (define bar (get_sqr)) \
+            (bar 2) \
+          ) \
+        ".to_string(), env);
+        assert_eq!(out_expr.unwrap(), Atom(Number::integer(4).unwrap()));
     }
 }
 
@@ -926,6 +944,42 @@ mod builtins_tests {
     }
 
     #[test]
+    fn cross_eval_env_loss_shouldnt_occur() {
+        let env = add_builtins(Env::new_empty());
+        let (_, env) = test_eval!("\
+            (begin
+                (define fact2                         \
+                  (lambda (n acc)                   \
+                    (if (<= n 1)                  \
+                        acc                       \
+                        (fact2 (- n 1) (* n acc)) \
+                    )                             \
+                  )                                 \
+                )
+                (define fact (lambda (n) (fact2 n 1)))\
+            )".to_string(), env);
+        assert_eq!(env.find(&"fact2".to_string()).is_ok(), true);
+        let (out_expr, _) = test_eval!("(fact 10)".to_string(), env);
+        assert_eq!(out_expr.unwrap().print().unwrap(), "3628800".to_string());
+        let env = add_builtins(Env::new_empty());
+        let (_, env) = test_eval!("\
+            (define fact2                         \
+                (lambda (n acc)                   \
+                    (if (<= n 1)                  \
+                        acc                       \
+                        (fact2 (- n 1) (* n acc)) \
+                    )                             \
+                )                                 \
+            )".to_string(), env);
+        let (_, env) = test_eval!("\
+            (begin \
+                (define fact (lambda (n) (fact2 n 1))\
+            ))".to_string(), env);
+        let (out_expr, _) = test_eval!("(fact 10)".to_string(), env);
+        assert_eq!(out_expr.unwrap().print().unwrap(), "3628800".to_string());
+    }
+
+    #[test]
     fn norvig_suite_1() {
         use std::num::strconv;
         use to_str = std::num::strconv::float_to_str_common;
@@ -935,7 +989,6 @@ mod builtins_tests {
                             add_builtins(Env::new_empty()));
         let two = "(area 3)".to_string();
         let (out_expr, env) = test_eval!(two, env);
-        //assert_eq!(out_expr.unwrap().print().unwrap().contains("28.27433"), true);
         assert_eq!(out_expr.unwrap().print().unwrap(), "28.274333877".to_string());
         let three = "\
             (define fact2                         \
@@ -947,7 +1000,11 @@ mod builtins_tests {
                 )                                 \
             )".to_string();
         let (_, env) = test_eval!(three, env);
-        let three_point_five = "(define fact (lambda (n) (fact2 n 1)))".to_string();
+        let three_point_five = "\
+            (begin \
+                (define fact3 fact2) \
+                (define fact (lambda (n) (fact3 n 1))\
+            ))".to_string();
         let (_, env) = test_eval!(three_point_five, env);
         let four = "(fact 10)".to_string();
         let (out_expr, env) = test_eval!(four, env);

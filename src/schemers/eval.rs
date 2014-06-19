@@ -38,7 +38,8 @@ pub fn eval<'env>(expr: Expr, env: Env) -> EvalResult {
                                          "eval: quote list shouldnt be empty".to_string());
                             Ok((Some(quoted_item), env))
                         },
-                        _ => return Err("eval: quote: should have List in cdr position".to_string())
+                        _ => return Err("eval: quote: should have List \
+                            in cdr position.".to_string())
                     }
                 },
                 Atom(ref val) if *val == Symbol("if".to_string()) => {
@@ -76,7 +77,7 @@ pub fn eval<'env>(expr: Expr, env: Env) -> EvalResult {
                     Ok((None, out_env))
                 },
                 Atom(ref val) if *val == Symbol("lambda".to_string()) => {
-                    let eval_result = try!(eval_lambda("anonymous".to_string(), cdr));
+                    let eval_result = try!(eval_lambda("anonymous".to_string(), cdr, env.clone()));
                     Ok((eval_result, env))
                 },
                 Atom(ref val) if *val == Symbol("begin".to_string()) => {
@@ -90,23 +91,18 @@ pub fn eval<'env>(expr: Expr, env: Env) -> EvalResult {
                             return Err(format!("eval: error w/ resolve symbol: {}", err))
                     };
                     match target_proc {
-                        Atom(Lambda(UserDefined(_, vars, body))) => {
+                        Atom(Lambda(UserDefined(_, vars, body, captured_env))) => {
                             match cdr {
                                 args @ List(_) => {
-                                    let (args, env) = try!(args.unbox_and_eval(env));
-                                    let new_env = match Env::new(Some(vars),
-                                                           Some(args), Some(env)) {
-                                        Ok(env) => env,
-                                        Err(e) =>
-                                            return Err(format!("eval(): error w/ nest env: {}", e))
-                                    };
-                                    let (out_expr, new_env) = try!(eval(*body, new_env));
-                                    let parent = match new_env.into_parent() {
-                                        Some(env) => env,
-                                        None => return Err(
-                                            "eval: error w/ get parent env".to_string())
-                                    };
-                                    Ok((out_expr, parent))
+                                    let (args, _) = try!(args.unbox_and_eval(
+                                        env.clone()));
+                                    let mut active_env = captured_env.clone();
+                                    active_env.enclose(env.clone());
+                                    let active_env = try!(Env::new(Some(vars),
+                                                           Some(args),
+                                                           Some(active_env)));
+                                    let (out_expr, _) = try!(eval(*body, active_env));
+                                    Ok((out_expr, env))
                                 },
                                 _ => return Err("eval: proc invoke: should've \
                                     gotten a list in the cdr".to_string())
@@ -155,8 +151,10 @@ fn eval_define(cdr: Expr, env: Env) -> SchemerResult<Env> {
                                     Err(e) => return Err(e)
                                 };
                                 match car {
-                                    Atom(ref val) if *val == Symbol("lambda".to_string()) => {
-                                        let result = try!(eval_lambda(name.to_string(), cdr));
+                                    Atom(ref val) if *val ==
+                                            Symbol("lambda".to_string()) => {
+                                        let result = try!(
+                                            eval_lambda(name.to_string(), cdr, env.clone()));
                                         (result, env)
                                     }
                                     _ => try!(eval(val_expr , env))
@@ -175,7 +173,7 @@ fn eval_define(cdr: Expr, env: Env) -> SchemerResult<Env> {
     }
 }
 
-fn eval_lambda(name: String, cdr: Expr) -> SchemerResult<Option<Expr>> {
+fn eval_lambda(name: String, cdr: Expr, env: Env) -> SchemerResult<Option<Expr>> {
     match cdr {
         List(mut items) => {
             if items.len() != 2 {
@@ -198,7 +196,7 @@ fn eval_lambda(name: String, cdr: Expr) -> SchemerResult<Option<Expr>> {
             }
             let item = try_opt!(items.shift(),
                                 "eval: lambda: lambda body should be there".to_string());
-            Ok(Some(Atom(Lambda(UserDefined(name, var_names, item)))))
+            Ok(Some(Atom(Lambda(UserDefined(name, var_names, item, env)))))
         },
         _ => return Err("eval: lambda: should be list in cdr position".to_string())
     }

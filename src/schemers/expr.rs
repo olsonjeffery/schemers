@@ -37,14 +37,14 @@ pub enum AtomVal {
 
 #[deriving(Clone)]
 pub enum LambdaVal {
-    UserDefined(String, Vec<String>, Box<Expr>),
+    UserDefined(String, Vec<String>, Box<Expr>, Env),
     BuiltIn(String, fn(args: Vec<Expr>, env: Env) -> SchemerResult<(Option<Expr>, Env)>)
 }
 
 impl LambdaVal {
     pub fn print(&self) -> PrintResult {
         match self {
-            &UserDefined(ref name, ref vars, _) => {
+            &UserDefined(ref name, ref vars, _, _) => {
                 let var_expr = List(vars.iter().map(|v| box Atom(Symbol(v.to_string()))).collect());
                 let printed_val = match var_expr.print() {
                     Ok(v) => v,
@@ -62,8 +62,8 @@ impl PartialEq for LambdaVal {
     // Our custom eq allows numbers which are near each other to be equal! :D
     fn eq(&self, other: &LambdaVal) -> bool {
         match self {
-            &UserDefined(ref name, ref args, ref body) => match other {
-                &UserDefined(ref other_name, ref other_args, ref other_body) =>
+            &UserDefined(ref name, ref args, ref body, _) => match other {
+                &UserDefined(ref other_name, ref other_args, ref other_body, _) =>
                     name == other_name &&
                 {
                     if args.len() != other_args.len() {
@@ -82,7 +82,7 @@ impl PartialEq for LambdaVal {
             &BuiltIn(ref name, ref body_fn) => match other {
                 &BuiltIn(ref other_name, ref other_body_fn) =>
                     *body_fn as *u8 == *other_body_fn as *u8 && name == other_name,
-                &UserDefined(_, _, _) => false
+                &UserDefined(_, _, _, _) => false
             }
         }
     }
