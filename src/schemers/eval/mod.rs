@@ -5,10 +5,12 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use expr::{Expr, Atom, List, Symbol, Boolean, Lambda, UserDefined, BuiltIn};
+use expr::{Expr, Atom, List, Symbol, Lambda, UserDefined, BuiltIn};
 use env::Env;
 use result::SchemerResult;
+
 pub type EvalResult = SchemerResult<(Option<Expr>, Env)>;
+pub mod if_impl;
 
 macro_rules! try_opt(
     ($e:expr, $msg:expr) => (match $e {
@@ -43,7 +45,7 @@ pub fn eval<'env>(expr: Expr, env: Env) -> EvalResult {
                     }
                 },
                 Atom(ref val) if *val == Symbol("if".to_string()) => {
-                    eval_if(cdr, env)
+                    if_impl::eval_if(cdr, env)
                 },
                 Atom(ref val) if *val == Symbol("set!".to_string()) => {
                     match cdr {
@@ -214,30 +216,5 @@ fn eval_begin(cdr: Expr, env: Env) -> EvalResult {
             Ok((out_expr, env))
         },
         _ => return Err("eval: begin: expcted a list for the input cdr".to_string())
-    }
-}
-
-fn eval_if(cdr: Expr, env: Env) -> EvalResult {
-    match cdr {
-        List(mut items) => {
-            if items.len() != 3 {
-                return Err("eval: if: should be three entries in if cdr list".to_string());
-            }
-            let first_arg = *try_opt!(items.shift(),
-                "eval: if: should have some val in arg first position".to_string());
-            let (out_expr, out_env) = try!(eval(
-                first_arg, env));
-            match out_expr {
-                Some(Atom(Boolean(false))) => {
-                    let consq_branch = *try_opt!(items.pop(),
-                                                "eval: if: got none in conseq branch".to_string());
-                    eval(consq_branch, out_env)
-                },
-                _ => eval(*try_opt!(items.shift(),
-                                   "eval: if: got none in else branch".to_string()),
-                          out_env)
-            }
-        },
-        _ => return Err("eval: if: should have List in cdr position".to_string())
     }
 }
