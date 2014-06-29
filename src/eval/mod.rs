@@ -10,7 +10,9 @@ use env::Env;
 use result::SchemerResult;
 
 pub type EvalResult = SchemerResult<(Option<Expr>, Env)>;
-pub mod if_impl;
+
+mod if_impl;
+mod begin;
 
 macro_rules! try_opt(
     ($e:expr, $msg:expr) => (match $e {
@@ -83,7 +85,7 @@ pub fn eval<'env>(expr: Expr, env: Env) -> EvalResult {
                     Ok((eval_result, env))
                 },
                 Atom(ref val) if *val == Symbol("begin".to_string()) => {
-                    eval_begin(cdr, env)
+                    begin::eval_begin(cdr, env)
                 },
                 // oh boy a procedure call!
                 Atom(Symbol(proc_name)) => {
@@ -201,20 +203,5 @@ fn eval_lambda(name: String, cdr: Expr, env: Env) -> SchemerResult<Option<Expr>>
             Ok(Some(Atom(Lambda(UserDefined(name, var_names, item, env)))))
         },
         _ => return Err("eval: lambda: should be list in cdr position".to_string())
-    }
-}
-
-fn eval_begin(cdr: Expr, env: Env) -> EvalResult {
-    match cdr {
-        List(items) => {
-            let (mut out_expr, mut env) = (None, env);
-            for e in items.move_iter() {
-                let (res_expr, res_env) = try!(eval(*e, env));
-                out_expr = res_expr;
-                env = res_env;
-            }
-            Ok((out_expr, env))
-        },
-        _ => return Err("eval: begin: expcted a list for the input cdr".to_string())
     }
 }
