@@ -69,7 +69,7 @@ else
   Q := @
 endif
 
-include tidy.mk
+include etc/tidy.mk
 
 all: $(DEFAULT)
 
