@@ -15,6 +15,7 @@ mod begin;
 mod define;
 mod if_impl;
 mod lambda;
+mod quote;
 
 macro_rules! try_opt(
     ($e:expr, $msg:expr) => (match $e {
@@ -29,25 +30,21 @@ pub fn eval<'env>(expr: Expr, env: Env) -> EvalResult {
             let out_val = try!(env.find(var_name));
             Ok((Some(out_val.clone()), env))
         },
+        // Literal value, return it outright
         val @ Atom(_) => Ok((Some(val), env)),
+        // Some kind of list expr
         list @ List(_) => {
+            // Empty list, return as-is
             if list.is_null() {
                 return Ok((Some(list), env));
             }
             let (car, cdr) = try!(list.un_cons());
             match car {
+                // (quote expr)
                 Atom(ref val) if *val == Symbol("quote".to_string())  => {
-                    match cdr {
-                        List(mut items) => {
-                            let quoted_item =
-                                *try_opt!(items.shift(),
-                                         "eval: quote list shouldnt be empty".to_string());
-                            Ok((Some(quoted_item), env))
-                        },
-                        _ => return Err("eval: quote: should have List \
-                            in cdr position.".to_string())
-                    }
+                    quote::eval_quote(cdr, env)
                 },
+                // (if (test) (conseq) (alt))
                 Atom(ref val) if *val == Symbol("if".to_string()) => {
                     if_impl::eval_if(cdr, env)
                 },
