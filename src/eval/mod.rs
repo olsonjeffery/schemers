@@ -13,6 +13,7 @@ pub type EvalResult = SchemerResult<(Option<Expr>, Env)>;
 
 mod if_impl;
 mod begin;
+mod lambda;
 
 macro_rules! try_opt(
     ($e:expr, $msg:expr) => (match $e {
@@ -81,7 +82,8 @@ pub fn eval<'env>(expr: Expr, env: Env) -> EvalResult {
                     Ok((None, out_env))
                 },
                 Atom(ref val) if *val == Symbol("lambda".to_string()) => {
-                    let eval_result = try!(eval_lambda("anonymous".to_string(), cdr, env.clone()));
+                    let eval_result = try!(lambda::eval_lambda(
+                            "anonymous".to_string(), cdr, env.clone()));
                     Ok((eval_result, env))
                 },
                 Atom(ref val) if *val == Symbol("begin".to_string()) => {
@@ -158,7 +160,9 @@ fn eval_define(cdr: Expr, env: Env) -> SchemerResult<Env> {
                                     Atom(ref val) if *val ==
                                             Symbol("lambda".to_string()) => {
                                         let result = try!(
-                                            eval_lambda(name.to_string(), cdr, env.clone()));
+                                            lambda::eval_lambda(
+                                                name.to_string(),
+                                                cdr, env.clone()));
                                         (result, env)
                                     }
                                     _ => try!(eval(val_expr , env))
@@ -174,34 +178,5 @@ fn eval_define(cdr: Expr, env: Env) -> SchemerResult<Env> {
                 }
         },
         _ => return Err("eval: define: should be list in cdr position".to_string())
-    }
-}
-
-fn eval_lambda(name: String, cdr: Expr, env: Env) -> SchemerResult<Option<Expr>> {
-    match cdr {
-        List(mut items) => {
-            if items.len() != 2 {
-                return Err("eval: lambda: should be two entries in cdr".to_string());
-            }
-            let mut var_names = Vec::new();
-            let item = *try_opt!(items.shift(),
-                                "eval: lambda: vars should be there".to_string());
-            match item {
-                List(vars) => {
-                    for v in vars.move_iter() {
-                        match v {
-                            box Atom(Symbol(var_name)) => {
-                                var_names.push(var_name.to_string());
-                            },
-                            _ => return Err("eval: lambda: var names must be symbols".to_string())
-                        }
-                    }
-                }, _ => return Err("eval: lambda: should have vars to be list".to_string())
-            }
-            let item = try_opt!(items.shift(),
-                                "eval: lambda: lambda body should be there".to_string());
-            Ok(Some(Atom(Lambda(UserDefined(name, var_names, item, env)))))
-        },
-        _ => return Err("eval: lambda: should be list in cdr position".to_string())
     }
 }
