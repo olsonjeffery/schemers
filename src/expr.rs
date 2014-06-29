@@ -81,7 +81,8 @@ impl PartialEq for LambdaVal {
             },
             &BuiltIn(ref name, ref body_fn) => match other {
                 &BuiltIn(ref other_name, ref other_body_fn) =>
-                    *body_fn as *u8 == *other_body_fn as *u8 && name == other_name,
+                    *body_fn as *mut u8 == *other_body_fn
+                        as *mut u8 && name == other_name,
                 &UserDefined(_, _, _, _) => false
             }
         }

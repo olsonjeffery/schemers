@@ -21,6 +21,7 @@ pub mod result;
 #[cfg(test)]
 mod test;
 
+/*
 #[cfg(not(test))]
 fn main() {
     use std::os::args;
@@ -46,3 +47,4 @@ fn main() {
         _ => {}
     }
 }
+*/
