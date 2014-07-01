@@ -81,7 +81,13 @@ pub fn eval<'env>(expr: Expr, in_env: Env) -> EvalResult {
                     },
                     // oh boy a procedure call!
                     Atom(Symbol(proc_name)) => {
-                        return invoke::eval_invoke(proc_name, cdr, env)
+                        match invoke::eval_invoke(proc_name, cdr, env) {
+                            invoke::UserDefinedInvoke(r) => match r {
+                                Ok((expr, env)) => { in_expr = expr; out_env = Some(env); },
+                                Err(e) => return Err(e)
+                            },
+                            invoke::BuiltInInvoke(r) => return r
+                        }
                     },
                     // otherwise an Err result
                     car => return Err(

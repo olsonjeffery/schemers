@@ -1009,14 +1009,6 @@ mod builtins_tests {
         let four = "(fact 10)".to_string();
         let (out_expr, env) = test_eval!(four, env);
         assert_eq!(out_expr.unwrap().print().unwrap(), "3628800".to_string());
-        /*
-        let five = "(fact 100)".to_string();
-        let (out_expr, env) = test_eval!(five, env);
-        assert_eq!(out_expr.unwrap().print().unwrap(), "9332621544394415268169923885626\
-67004907159682643816214685929638952175999932299156089414639\
-76156518286253697920827223758251185210916864000000000000000\
-000000000".to_string());
-        */
         let six = "(area (fact 10))".to_string();
         let (out_expr, env) = test_eval!(six, env);
         let fl_val: f64 = FromStr::from_str(out_expr.unwrap().print().unwrap().as_slice())
@@ -1067,5 +1059,20 @@ mod builtins_tests {
         let nine = "(if (> 1 (length (list 1 2 3))) (quote conseq) (quote alt))".to_string();
         let (out_expr, _) = test_eval!(nine, env);
         assert_eq!(out_expr.unwrap().print().unwrap(), "alt".to_string());
+    }
+
+    #[test]
+    fn tco_works_hurray() {
+        let (_, env) = test_eval!("
+            (begin
+                (define fact2
+                    (lambda (n acc)
+                        (if (<= n 1)
+                            acc
+                            (fact2 (- n 1) (* n acc))
+                        )))
+                (define fact (lambda (n) (fact2 n 1))))".to_string(),
+            add_builtins(Env::new_empty()));
+        let (_, _) = test_eval!("(fact 100)".to_string(), env);
     }
 }
