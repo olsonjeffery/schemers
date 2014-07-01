@@ -5,20 +5,25 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::{EvalResult, eval};
+use super::{TrampolineResult, eval};
 use expr::{Expr, List};
 use env::Env;
 
-pub fn eval_begin(cdr: Expr, env: Env) -> EvalResult {
+pub fn eval_begin(cdr: Expr, mut env: Env) -> TrampolineResult {
     match cdr {
         List(items) => {
-            let (mut out_expr, mut env) = (None, env);
+            let mut ctr = 1;
+            let total_len = items.len();
             for e in items.move_iter() {
-                let (res_expr, res_env) = try!(eval(*e, env));
-                out_expr = res_expr;
-                env = res_env;
+                if ctr == total_len {
+                    return Ok((Some(*e), Some(env)))
+                } else {
+                    let (_, res_env) = try!(eval(*e, env));
+                    env = res_env;
+                    ctr += 1;
+                }
             }
-            Ok((out_expr, env))
+            return Err("eval: begin: Exited loop, shouldn't happen".to_string())
         },
         _ => return Err("eval: begin: expcted a list for the input cdr".to_string())
     }
