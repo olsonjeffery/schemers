@@ -40,29 +40,35 @@ pub fn eval<'env>(expr: Expr, env: Env) -> EvalResult {
                 Atom(ref val) if *val == Symbol("quote".to_string())  => {
                     quote::eval_quote(cdr, env)
                 },
-                // (if (test) (conseq) (alt))
-                Atom(ref val) if *val == Symbol("if".to_string()) => {
-                    if_impl::eval_if(cdr, env)
-                },
+                // (set! var-name expr)
                 Atom(ref val) if *val == Symbol("set!".to_string()) => {
                     set::eval_set(cdr, env)
                 },
+                // (define var-name expr)
                 Atom(ref val) if *val == Symbol("define".to_string()) => {
                     let out_env = try!(define::eval_define(cdr, env));
                     Ok((None, out_env))
                 },
+                // (lamda (args) expr)
                 Atom(ref val) if *val == Symbol("lambda".to_string()) => {
                     let eval_result = try!(lambda::eval_lambda(
                             "anonymous".to_string(), cdr, env.clone()));
                     Ok((eval_result, env))
                 },
+                // (if (test) (conseq) (alt))
+                Atom(ref val) if *val == Symbol("if".to_string()) => {
+                    if_impl::eval_if(cdr, env)
+                },
+                // (begin (expr) [..(expr)])
                 Atom(ref val) if *val == Symbol("begin".to_string()) => {
                     begin::eval_begin(cdr, env)
                 },
                 // oh boy a procedure call!
                 Atom(Symbol(proc_name)) => {
                     invoke::eval_invoke(proc_name, cdr, env)
-                }, _ => return Err("car of list isn't a symbol for invocation lookup".to_string())
+                },
+                // otherwise an Err result
+                _ => return Err("car of list isn't a symbol for invocation lookup".to_string())
             }
         }
     }
