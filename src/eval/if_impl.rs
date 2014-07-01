@@ -25,16 +25,13 @@ pub fn eval_if(cdr: Expr, env: Env) -> EvalResult {
                 "eval: if: should have some val in arg first position".to_string());
             let (out_expr, out_env) = try!(eval(
                 first_arg, env));
-            match out_expr {
-                Some(Atom(Boolean(false))) => {
-                    let consq_branch = *try_opt!(items.pop(),
-                                                "eval: if: got none in conseq branch".to_string());
-                    eval(consq_branch, out_env)
-                },
-                _ => eval(*try_opt!(items.shift(),
-                                   "eval: if: got none in else branch".to_string()),
-                          out_env)
-            }
+            let out_branch = match out_expr {
+                // alt branch -- only returned if test returns false
+                Some(Atom(Boolean(false))) => items.pop(),
+                // conseq branch -- returned on all other results
+                _ => items.shift(),
+            };
+            return Ok((out_branch.map(|n| *n), out_env))
         },
         _ => return Err("eval: if: should have List in cdr position".to_string())
     }

@@ -10,7 +10,6 @@ use env::Env;
 use result::SchemerResult;
 
 pub type EvalResult = SchemerResult<(Option<Expr>, Env)>;
-pub type TrampolineResult = SchemerResult<(Option<Expr>, Option<Env>)>;
 
 mod begin;
 mod define;
@@ -68,12 +67,15 @@ pub fn eval<'env>(expr: Expr, in_env: Env) -> EvalResult {
                     },
                     // (if (test) (conseq) (alt))
                     Atom(ref val) if *val == Symbol("if".to_string()) => {
-                        return if_impl::eval_if(cdr, env)
+                        match if_impl::eval_if(cdr, env) {
+                            Ok((expr, env)) => { in_expr = expr; out_env = Some(env); },
+                            Err(e) => return Err(e)
+                        }
                     },
                     // (begin (expr) [..(expr)])
                     Atom(ref val) if *val == Symbol("begin".to_string()) => {
                         match begin::eval_begin(cdr, env) {
-                            Ok((expr, env)) => { in_expr = expr; out_env = env; },
+                            Ok((expr, env)) => { in_expr = expr; out_env = Some(env); },
                             Err(e) => return Err(e)
                         }
                     },
