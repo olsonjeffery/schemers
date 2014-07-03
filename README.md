@@ -8,8 +8,6 @@ The codebase is well tested, with many examples demonstrating the use of all of 
 
 ## Upcoming Work
 
-* TCO
-  * `fact(100)` in the `norvig_suite` is currently disabled. This obviously needs to be enabled again (and work!)
 * Hygenic Macros (do want `let`)
 * Some benchmarks:
   * `fact(1000)` (can't be done before TCO lands)
