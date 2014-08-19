@@ -41,8 +41,8 @@ impl Env {
             };
             if params.len() == args.len() {
                 for ctr in range(0,params.len()) {
-                    let var_name = params.get(ctr).to_string();
-                    let arg = args.get(ctr).clone();
+                    let var_name = params[ctr].to_string();
+                    let arg = args[ctr].clone();
                     entries.insert(var_name, arg);
                 }
             } else {

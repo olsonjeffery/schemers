@@ -4,7 +4,7 @@
 // at the top-level of this repository.
 // This file may not be copied, modified, or distributed
 // except according to those terms.
-#![crate_id="http://olsonjeffery.github.io#schemers:0.0.1"]
+#![crate_name="schemers"]
 #![desc = "Simple Scheme Interpreter"]
 #![license = "3-Clause BSD"]
 #![feature(macro_rules)]

@@ -55,7 +55,7 @@ fn builtin_arithmetic(mut args: Vec<Expr>, env: Env,
         }
     }
     let out_val = if hasFloats {
-        let mut out_val = match args.shift()
+        let mut out_val = match args.remove(0)
             {
                 Some(v) => match v {
                     v @ Atom(Integer(_)) | v @ Atom(Float(_)) => match v.into_float() {
@@ -78,7 +78,7 @@ fn builtin_arithmetic(mut args: Vec<Expr>, env: Env,
         }
         Atom(Float(out_val))
     } else {
-        let mut out_val = match args.shift() {
+        let mut out_val = match args.remove(0) {
             Some(v) => match v {
                     v @ Atom(Integer(_)) | v @ Atom(Float(_)) => match v.into_integer() {
                         Ok(v) => v,
@@ -146,7 +146,7 @@ fn builtin_predicate_compare(mut args: Vec<Expr>,
     }
     let out_val = if hasFloats {
         let mut state = false;
-        let mut left = match args.shift() {
+        let mut left = match args.remove(0) {
             None => return Err(format!("{}: head of less-than args should be Some()", name)),
             Some(v) => match v {
                     left @ Atom(Integer(_)) |
@@ -167,7 +167,7 @@ fn builtin_predicate_compare(mut args: Vec<Expr>,
         Atom(Boolean(state))
     } else {
         let mut state = false;
-        let mut left = match args.shift() {
+        let mut left = match args.remove(0) {
             None => return Err(format!("{}: head of less-than args should be Some()", name)),
             Some(v) => match v {
                 left @ Atom(Integer(_))
@@ -239,7 +239,7 @@ fn builtin_eq(mut args: Vec<Expr>, env: Env) -> SchemerResult<(Option<Expr>, Env
         return Err(format!("eq: expect at least two parameters"))
     }
     let mut state = false;
-    let mut left = match args.shift() {
+    let mut left = match args.remove(0) {
         Some(v) => v,
         None => return Err("head of eq args should be Some()".to_string())
     };
@@ -254,7 +254,7 @@ fn builtin_length(mut args: Vec<Expr>, env: Env) -> SchemerResult<(Option<Expr>,
     if args.len() != 1 {
         return Err(format!("length: expects only a single list parameter"))
     }
-    match args.shift() {
+    match args.remove(0) {
         Some(v) => match v {
             List(items) => {
                 println!("length: {}", items.len());
@@ -273,11 +273,11 @@ fn builtin_cons(mut args: Vec<Expr>, env: Env) -> SchemerResult<(Option<Expr>, E
     if args.len() != 2 {
         return Err(format!("cons: expects two parameters"))
     }
-    let arg_one = match args.shift() {
+    let arg_one = match args.remove(0) {
         Some(v) => v,
         None => return Err("cons: None in arg one".to_string())
     };
-    let arg_two = match args.shift() {
+    let arg_two = match args.remove(0) {
         Some(v) => v,
         None => return Err("cons: None in arg two".to_string())
     };
@@ -324,7 +324,7 @@ fn builtin_append(mut args: Vec<Expr>, env: Env) -> SchemerResult<(Option<Expr>,
     if args.len() != 2 {
         return Err("append: expect two arguments".to_string());
     }
-    let out_items = match args.shift() {
+    let out_items = match args.remove(0) {
         Some(v) => match v {
             List(mut items) => {
                 let boxed_arg = match args.pop() {
@@ -347,7 +347,7 @@ fn builtin_is_list(mut args: Vec<Expr>, env: Env) -> SchemerResult<(Option<Expr>
     if args.len() != 1 {
         return Err("list?: expect a single argument".to_string());
     }
-    let result = match args.shift() {
+    let result = match args.remove(0) {
         Some(v) => match v {
             List(_) => {
                 Atom(Boolean(true))
@@ -362,7 +362,7 @@ fn builtin_is_null(mut args: Vec<Expr>, env: Env) -> SchemerResult<(Option<Expr>
     if args.len() != 1 {
         return Err("null?: expect a single argument".to_string());
     }
-    let result = match args.shift() {
+    let result = match args.remove(0) {
         Some(v) => match v {
             List(ref v) if v.len() == 0 => {
                 Atom(Boolean(true))
@@ -377,7 +377,7 @@ fn builtin_is_symbol(mut args: Vec<Expr>, env: Env) -> SchemerResult<(Option<Exp
     if args.len() != 1 {
         return Err("symbol?: expect a single argument".to_string());
     }
-    let result = match args.shift() {
+    let result = match args.remove(0) {
         Some(v) => match v {
             Atom(Symbol(_)) => {
                 Atom(Boolean(true))
@@ -392,7 +392,7 @@ fn builtin_display(mut args: Vec<Expr>, env: Env) -> SchemerResult<(Option<Expr>
     if args.len() != 1 {
         return Err("display: expect a single argument".to_string());
     }
-    let arg = match args.shift() {
+    let arg = match args.remove(0) {
         Some(v) => v,
         None => return Err("display: None in arg".to_string())
     };

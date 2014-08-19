@@ -71,8 +71,8 @@ impl PartialEq for LambdaVal {
                     }
                     let mut args_match = true;
                     for ctr in range(0, args.len()) {
-                        args_match = args.get(ctr)
-                            == other_args.get(ctr);
+                        args_match = args[ctr]
+                            == other_args[ctr];
                     }
                     args_match
                 } &&
@@ -173,9 +173,6 @@ impl Expr {
                     }
                 }
                 Ok(printed_val.as_slice().trim().to_string().append(")"))
-                //let out = items.iter().map(|i| i.print())
-                //    .fold("(".to_string(), |m, v| m.append(v.append(" ").as_slice()));
-                //out.as_slice().trim().to_string().append(")")
             },
             &Atom(ref v) => (*v).print()
         }
@@ -189,7 +186,7 @@ impl Expr {
                     return Err("expr.un_cons(): cannot build car/cdr of empty list"
                                .to_string());
                 }
-                let car = match items.shift() {
+                let car = match items.remove(0) {
                     Some(v) => v,
                     None => return Err("expr.un_cons(): items collection empty; \
                         shouldn't happen".to_string())
@@ -256,7 +253,7 @@ impl AtomVal {
     pub fn print(&self) -> PrintResult {
         match self {
             &Symbol(ref v) => Ok(v.to_string()),
-            &Integer(ref v) => Ok(v.to_str()),
+            &Integer(ref v) => Ok(v.to_string()),
             &Float(ref v) => match Number::float_print(v) {
                 Ok(v) => Ok(v),
                 Err(e) => return Err(e)
@@ -302,7 +299,7 @@ pub mod Number {
     }
     // adapted from https://gist.github.com/kballard/4771f0d338fbb1896446
     pub fn float_print(v: &BigRational) -> PrintResult {
-        let mut s = v.to_integer().to_str();
+        let mut s = v.to_integer().to_string();
         let mut v = v.fract();
         if !v.is_zero() {
             s.push_char('.');

@@ -21,7 +21,7 @@ pub fn eval_if(cdr: Expr, env: Env) -> EvalResult {
             if items.len() != 3 {
                 return Err("eval: if: should be three entries in if cdr list".to_string());
             }
-            let first_arg = *try_opt!(items.shift(),
+            let first_arg = *try_opt!(items.remove(0),
                 "eval: if: should have some val in arg first position".to_string());
             let (out_expr, out_env) = try!(eval(
                 first_arg, env));
@@ -29,7 +29,7 @@ pub fn eval_if(cdr: Expr, env: Env) -> EvalResult {
                 // alt branch -- only returned if test returns false
                 Some(Atom(Boolean(false))) => items.pop(),
                 // conseq branch -- returned on all other results
-                _ => items.shift(),
+                _ => items.remove(0),
             };
             return Ok((out_branch.map(|n| *n), out_env))
         },

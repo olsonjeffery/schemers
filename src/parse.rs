@@ -26,20 +26,20 @@ pub fn tokenize(input: String) -> Vec<String> {
 }
 
 pub fn parse(tokens: &mut Vec<String>) -> ExprResult {
-    let current_token = match tokens.shift() {
+    let current_token = match tokens.remove(0) {
         Some(t) => t,
         None => return Err("parse: calling w/ empty token list; shouldn't happen".to_string())
     };
     match current_token {
         ref x if *x == "(".to_string() => {
             let mut list = Vec::new();
-            while *tokens.get(0) != ")".to_string() {
+            while (*tokens)[0] != ")".to_string() {
                 match parse(tokens) {
                     Ok(expr) => list.push(box expr),
                     err => return err
                 }
             }
-            tokens.shift();
+            tokens.remove(0);
             Ok(List(list))
         },
         ref x if *x == ")".to_string() =>

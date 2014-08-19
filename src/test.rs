@@ -34,11 +34,11 @@ mod parser_tests {
     fn tokenize_string_into_tokens() {
         let tokens = tokenize("(foo 12 3)".to_string());
         assert_eq!(tokens.len(), 5);
-        assert_eq!(tokens.get(0).to_string(), "(".to_string());
-        assert_eq!(tokens.get(1).to_string(), "foo".to_string());
-        assert_eq!(tokens.get(2).to_string(), "12".to_string());
-        assert_eq!(tokens.get(3).to_string(), "3".to_string());
-        assert_eq!(tokens.get(4).to_string(), ")".to_string());
+        assert_eq!(tokens[0].to_string(), "(".to_string());
+        assert_eq!(tokens[1].to_string(), "foo".to_string());
+        assert_eq!(tokens[2].to_string(), "12".to_string());
+        assert_eq!(tokens[3].to_string(), "3".to_string());
+        assert_eq!(tokens[4].to_string(), ")".to_string());
     }
 
     #[test]
@@ -84,12 +84,12 @@ mod parser_tests {
             List(items) => {
                 let items_len = items.len();
                 assert!(3 == items_len);
-                assert_eq!(items.get(0).is_atom(), true);
-                assert_eq!(*items.get(0), box Atom(Symbol("bar".to_string())));
-                assert_eq!(items.get(1).is_atom(), true);
-                assert_eq!(*items.get(1), box Atom(Number::integer(12).unwrap()));
-                assert_eq!(items.get(2).is_atom(), true);
-                assert_eq!(*items.get(2), box Atom(Number::integer(45).unwrap()));
+                assert_eq!(items[0].is_atom(), true);
+                assert_eq!(items[0], box Atom(Symbol("bar".to_string())));
+                assert_eq!(items[1].is_atom(), true);
+                assert_eq!(items[1], box Atom(Number::integer(12).unwrap()));
+                assert_eq!(items[2].is_atom(), true);
+                assert_eq!(items[2], box Atom(Number::integer(45).unwrap()));
             },
             _ => fail!("got back an atom, it seems")
         }
@@ -103,24 +103,24 @@ mod parser_tests {
             List(items) => {
                 let items_len = items.len();
                 assert!(4 == items_len);
-                match *items.get(0) {
+                match items[0] {
                     box List(ref items) => {
                         assert_eq!(items.len(), 2);
-                        assert_eq!(*items.get(0), box Atom(Number::integer(2).unwrap()));
-                        assert_eq!(*items.get(1), box Atom(Number::integer(3).unwrap()));
+                        assert_eq!(items[0], box Atom(Number::integer(2).unwrap()));
+                        assert_eq!(items[1], box Atom(Number::integer(3).unwrap()));
                     },
                     _ => fail!("shoulda got a list")
                 }
-                assert_eq!(*items.get(1), box Atom(Symbol("bar".to_string())));
-                assert_eq!(*items.get(2), box Atom(Number::integer(12).unwrap()));
-                match *items.get(3) {
+                assert_eq!(items[1], box Atom(Symbol("bar".to_string())));
+                assert_eq!(items[2], box Atom(Number::integer(12).unwrap()));
+                match items[3] {
                     box List(ref items) => {
                         assert_eq!(items.len(), 2);
-                        assert_eq!(*items.get(0), box Atom(Symbol("hee".to_string())));
-                        match *items.get(1) {
+                        assert_eq!(items[0], box Atom(Symbol("hee".to_string())));
+                        match items[1] {
                             box List(ref items) => {
                                 assert_eq!(items.len(), 1);
-                                assert_eq!(*items.get(0), box Atom(Symbol("hah".to_string())));
+                                assert_eq!(items[0], box Atom(Symbol("hah".to_string())));
                             },
                             _ => fail!("shoulda got a list")
                         }
@@ -145,9 +145,9 @@ mod parser_tests {
         match &expr {
             &List(ref items) => {
                 assert_eq!(items.len(), 3);
-                assert_eq!(items.get(0), &box Atom(Symbol("x".to_string())));
-                assert_eq!(items.get(1), &box Atom(Symbol("y".to_string())));
-                assert_eq!(items.get(2), &box Atom(Symbol("z".to_string())));
+                assert_eq!(items[0], box Atom(Symbol("x".to_string())));
+                assert_eq!(items[1], box Atom(Symbol("y".to_string())));
+                assert_eq!(items[2], box Atom(Symbol("z".to_string())));
             }, _ => fail!("expected a list")
         }
         assert_eq!(expr.print().unwrap(), "(x y z)".to_string())
@@ -276,8 +276,8 @@ mod eval_tests {
         match out_expr.unwrap() {
             List(items) => {
                 assert_eq!(items.len(), 2);
-                assert_eq!(*items.get(0), box Atom(Symbol("x".to_string())));
-                assert_eq!(*items.get(1), box Atom(Number::integer(37).unwrap()));
+                assert_eq!(items[0], box Atom(Symbol("x".to_string())));
+                assert_eq!(items[1], box Atom(Number::integer(37).unwrap()));
             },
             _ => fail!("expected a list")
         }
@@ -443,7 +443,7 @@ mod eval_tests {
                 match body {
                     UserDefined(_, vars, body, _) => {
                         assert_eq!(vars.len(), 1);
-                        assert_eq!(vars.get(0), &"x".to_string());
+                        assert_eq!(vars[0], "x".to_string());
                         assert_eq!(*body, Atom(Number::integer(37).unwrap()));
                     }, _ => fail!("expected a UserDefined")
                 }
@@ -520,9 +520,9 @@ mod eval_tests {
         match out_expr.unwrap() {
             List(items) => {
                 assert_eq!(items.len(), 3);
-                assert_eq!(*items.get(0), box Atom(Number::integer(1).unwrap()));
-                assert_eq!(*items.get(1), box Atom(Symbol("x".to_string())));
-                assert_eq!(*items.get(2), box Atom(Number::float(3.4).unwrap()));
+                assert_eq!(items[0], box Atom(Number::integer(1).unwrap()));
+                assert_eq!(items[1], box Atom(Symbol("x".to_string())));
+                assert_eq!(items[2], box Atom(Number::float(3.4).unwrap()));
             }, _ => fail!("expected a list")
         }
     }
